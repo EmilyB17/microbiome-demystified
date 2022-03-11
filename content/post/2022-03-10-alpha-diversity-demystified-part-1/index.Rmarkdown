@@ -13,6 +13,10 @@ image:
   caption: ''
   focal_point: ''
   preview_only: no
+output:
+  blogdown::html_page:
+    toc: true
+    fig_width: 6
 ---
 
 

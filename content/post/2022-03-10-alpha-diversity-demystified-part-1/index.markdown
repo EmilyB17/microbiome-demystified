@@ -7,14 +7,16 @@ categories: ["tutorials"]
 tags: ["alpha diversity"]
 subtitle: 'Part 1: The Basics'
 summary: " A start-to-finish guide on alpha diversity indices and choosing an appropriate alpha diversity metric in a 16S analysis. In Part 1, we'll use a simplified dataset to build each metric from scratch. In Part 2, we'll apply those metrics to a real microbiome dataset and do a statistical analysis."
-authors: []
 lastmod: '2022-03-10T18:40:39-05:00'
 featured: yes
 image:
   caption: ''
   focal_point: ''
   preview_only: no
-projects: []
+output:
+  blogdown::html_page:
+    toc: true
+    fig_width: 6
 ---
 
 
@@ -146,7 +148,7 @@ plot.dat <- alpha %>%
 ggscatter(data = plot.dat, x = "Sample", y = "Observed", color = "Sample")
 ```
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="672" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="576" />
 
 
 ```r
@@ -302,7 +304,7 @@ ggbarplot(data = plot.datv, x = "Sample", y = "richness", fill = "index",
           legend = "left") 
 ```
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="672" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="576" />
 Importantly, we would come to the same conclusion regardless of the index we chose for our analysis: Jenny's microbiome has higher richness than Sarah's. We would observe a slightly larger effect size with ACE, but it would not change our overall results.
 
 
@@ -442,7 +444,7 @@ ggbarplot(data = plot.datv, x = "Sample", y = "richness", fill = "index",
           legend = "left") 
 ```
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-14-1.png" width="672" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-14-1.png" width="576" />
 Similarly to the richness estimates, our general conclusions are the same regardless of which index we choose. We conclude that Jenny's microbiome has higher "alpha diversity" than Sarah's microbiome. In contrast to the richness estimates, however, the indices differ amongst each other. It's important to remember that **we can't compare between different alpha diversity indices**.
 
 
