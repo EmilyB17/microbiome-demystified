@@ -62,6 +62,9 @@ markup:
   goldmark:
     renderer:
       unsafe: true
+  tableOfContents:
+    startLevel: 1
+    endLevel: 3
 related:
   threshold: 80
   includeNewer: true
