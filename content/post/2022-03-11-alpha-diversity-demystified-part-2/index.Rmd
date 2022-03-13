@@ -1,0 +1,394 @@
+---
+title: 'Alpha Diversity Demystified: Part 2'
+author: Emily Van Syoc
+date: '2022-03-11'
+slug: alpha-diversity-demystified-part-2
+categories: []
+tags: []
+subtitle: 'Part 2: Applying alpha diversity to a microbiome'
+summary: "In Part 1, we calculated each common alpha diversity metric by hand and build a fundamental understanding of the differences between 'richness' and 'evenness'. In Part 2, we will apply these  metrics to a realistic microbiome dataset and perform a statistical analysis, resulting in publication-ready results and figures."
+lastmod: '2022-03-11T12:17:42-05:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: no
+projects: []
+# SET AS DRAFT
+draft: true
+output:
+  blogdown::html_page:
+    #code_download: true
+    toc: true
+    #toc_float: true
+    fig_width: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Alpha Diversity in a "real" microbiome
+
+In Part 1, we made a very simplistic 'microbiome'. In Part 2, we'll work with one of the built-in datasets from the `microViz` package. 
+
+## What's our dataset
+
+The dataset we'll use is called "ibd_phylo" from the `corncob` package. This is from a 2017 dataset and compares 16S data from children with ulcerative colitis and Crohn's disease, to healthy children.
+
+### Our research question:
+
+Here's the first version of our research question that you'll see most often in microbiome papers: 
+**Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower alpha diversity than the microbiome of healthy children?**
+
+BUT...
+Remember from Part 1 that there are several alpha diversity metrics that estimate richness, evenness, or both. Let's be a little more specific with our research question and specify the metrics that we'll use *a priori*.
+**Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower richness (Chao1) or evenness Shannon's H index) than the microbiome of healthy children?**
+
+
+First, we'll install the necessary packages.
+
+```{r, eval = FALSE, code_folding = TRUE}
+
+# if needed, install the requisite packages
+install.packages(c("vegan", "ggpubr", "BiocManager", "tidyverse", "corncob", "devtools", "colorspace"))
+BiocManager::install("phyloseq")
+devtools:install_github("david-barnett/microViz@0.9.0") # we want the latest version
+
+```
+
+```{r}
+
+# load packages and get the dataset
+library(vegan)
+library(ggpubr)
+library(tidyverse)
+library(corncob)
+library(phyloseq)
+library(microViz)
+library(colorspace)
+
+# get the dataset
+data(ibd_phylo)
+
+```
+
+There are 91 samples in the dataset and 36,439 bacterial taxa. The explanatory variable that we're interested in is called "DiseaseState". There is one sample categorized as "IBDundef", so we'll remove that sample before continuing. 
+There are several additional sample variables that we would want to examine for covariates, but to keep this simple we'll treat it as an ANOVA analysis.
+
+```{r}
+
+# what's in this dataset?
+ibd_phylo
+
+# how many unique DiseaseStates in the dataset?
+unique(ibd_phylo@sam_data$DiseaseState)
+
+## use "ps_filter" from Microviz to remove the "IBDundef" sample
+ps <- ibd_phylo %>% 
+  microViz::ps_filter(!DiseaseState == "IBDundef")
+
+```
+
+## Get alpha diversity metrics with `estimate_richness`
+
+The build-in alpha diversity function in `phyloseq` is called "estimate_richness". We'll calculate all metrics on our dataset. This creates a dataframe that we'll call "alpha".
+
+**Remember: alpha diversity is calculated independently for each sample**
+
+```{r}
+
+## GET ALPHA DIVERSITY
+
+alpha <- estimate_richness(ps)
+
+# print the first few rows
+knitr::kable(head(alpha))
+
+```
+
+The dataframe this creates is a little clunky, so we'll use `microViz` to add our explanatory variable of interest (DiseaseState). `estimate_richness` moves the sample names of the phyloseq object to rownames in the dataframe, and adds a leading "X" to the rownames because they are numeric. This adds an extra line of code to wrangle.
+
+```{r}
+
+## Get our explanatory variable added to the alpha dataset
+
+# first, get our sample_data in a dataframe
+sampdf <- samdat_tbl(ps) %>% 
+  # for simplicity, select only the variable of interest
+  select(.sample_name, DiseaseState)
+
+## add our sample data to the alpha dataframe
+alpha <- alpha %>% 
+  # first, fix the rownames issue
+  rownames_to_column(var = ".sample_name") %>% 
+  mutate(.sample_name = str_remove_all(.sample_name, "^X")) %>% 
+  # join to the sample data
+  full_join(sampdf, by = ".sample_name")
+
+```
+
+## Exploratory analysis: get to know our data
+
+I always like to start with making some plots of the data to look at model diagnostics, get to know the data, and look for any potential issues. `phyloseq` has a built-in plotting mechanism. Since we chose Chao1 and Shannon's index, we'll plot those: 
+
+```{r}
+# plot with phyloseq
+plot_richness(ps, x = "DiseaseState", color = "DiseaseState",
+              measures = c("Shannon", "Chao1"))
+```
+
+We'll also get summary statistics on our data with `rstatix`:
+
+```{r}
+
+# get summary statistics - overall
+knitr::kable(alpha %>% 
+               get_summary_stats(type = "common"))
+
+```
+
+We can also get summary statistics for our metrics of interest and the explanatory variables:
+
+```{r}
+
+# get summary stats
+knitr::kable(alpha %>% 
+  select(DiseaseState, Shannon, Chao1) %>% 
+  group_by(DiseaseState) %>% 
+  get_summary_stats(type = "common"))
+
+```
+
+This dataset is very imbalanced (almost double the number of subjects with ulcerative colitis compared to healthy & Crohn's!) but we'll ignore that for now...
+
+### Model Diagnostics: Chao1
+
+Let's build a linear model for Chao1 and test it for parametric fit. 
+```{r}
+
+# build a test model 
+testmod <- lm(Chao1 ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod) # base R's built-in diagnostic plots
+
+# plot a histogram of residuals
+hist(resid(testmod), main = "Residual histogram")
+
+```
+
+There's some issues with normality (shown by the QQ-plot and histogram). Let's try a log transformation:
+
+```{r}
+
+# log transform the dependent variable
+testmod1 <- lm(log1p(Chao1) ~ DiseaseState, data = alpha)
+
+## examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod1) # base R's built-in diagnostic plots
+
+# plot a histogram of residuals
+dev.off()
+hist(resid(testmod1), main = "Residual histogram of log transformation")
+
+```
+
+This looks better! We'll do our ANOVA with a log transformation.
+
+## Build the model: Chao 1
+
+```{r}
+
+## perform ANOVA test (with base R)
+modChao <- aov(log1p(Chao1) ~ DiseaseState, data = alpha)
+
+# get the summary
+summary(modChao)
+
+```
+
+The ANOVA is significant, let's take a look at the Tukey's post-hoc test:
+
+```{r}
+
+# Tukey's post hoc
+TukeyHSD(modChao)
+
+```
+There is only a difference between ulcerative colitis and healthy (non-IBD) samples. Let's plot that to examine - instead of a boxplot, we'll use a violin plot that shows the distribution of the data. Since we log transformed our data, we can also plot the log transformation with `ggpar`. 
+
+```{r}
+
+# create a violin plot in ggpubr
+plot1 <- ggviolin(data = alpha, x = "DiseaseState", y = "Chao1", 
+                  # color by DiseaseState
+          fill = "DiseaseState",
+          # add the data points
+          add = "jitter")
+
+# transform the y axis to log 10
+ggpar(plot1, yscale = "log10", format.scale = TRUE,
+      ylab = "log(Chao1") 
+
+```
+
+Looks good! After this analysis, we would conclude that the gut microbiome of the children in the study had lower richness than healthy children (F~2~,~87~ = 3.544, Tukey post hoc adjusted p = 0.046) and there were no differences between children with Crohn's Disease and healthy children (Tukey post hoc adjusted p = 0.900) or between Crohn's Disease and ulcerative colitis (Tukey post hoc adjusted p = 0.147).
+
+### Model Diagnostics: Shannon's H
+
+We'll repeat this process for Shannon's index. Let's build a linear model for Shannon's index  and test it for parametric fit. 
+
+```{r}
+
+# build a test model 
+testmod <- lm(Shannon ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod) # base R's built-in diagnostic plots
+
+# plot a histogram of residuals
+hist(resid(testmod), main = "Residual histogram")
+
+```
+
+This doesn't look awful, but it's not fantastic... let's try a log transformation.
+
+```{r}
+
+# build a test model with a log transformation
+testmod1 <- lm(log1p(Shannon) ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod1) # base R's built-in diagnostic plots
+
+# plot a histogram of residuals
+dev.off()
+hist(resid(testmod1), main = "Residual histogram with log transformation")
+```
+
+Eh, not a huge improvement. We'll use the un-transformed data and proceed. 
+
+## Build the model: Shannon's H index
+
+```{r}
+
+## perform ANOVA test (with base R)
+modShan <- aov(Shannon ~ DiseaseState, data = alpha)
+
+# get the summary
+summary(modShan)
+
+```
+
+This model is also significant. Let's look at the post-hoc test:
+
+```{r}
+
+# Tukey's post-hoc test
+TukeyHSD(modShan)
+
+```
+
+Similarly to Chao1, we see a difference only between ulcerative colitis and healthy samples. Let's plot this: 
+
+```{r}
+
+# create a violin plot in ggpubr
+ggviolin(data = alpha, x = "DiseaseState", y = "Shannon", 
+                  # color by DiseaseState
+          fill = "DiseaseState",
+          # add the data points
+          add = "jitter")
+
+```
+
+Looks good! After this analysis, we would conclude that the gut microbiome of the children in the study had lower evenness than healthy children (F~2~,~87~ = 3.709, Tukey post hoc adjusted p = 0.0289) and there were no differences between children with Crohn's Disease and healthy children (Tukey post hoc adjusted p = 0.704) or between Crohn's Disease and ulcerative colitis (Tukey post hoc adjusted p = 0.224).
+
+# A caution of multiple comparisons
+
+Keep in mind that we're using these TWO metrics to describe ONE parameter: alpha diversity. Technically, that's a violation of multiple comparisons. We should be correcting our analyses for 2 comparisons. What if we decided to analyze a few more metrics, like Shannon's and Simpson's, or Simpson's and Inverse Simpson's?
+
+One, those all tell us different versions of the same story, so using more than one is not necessarily informative. Two, we now need to account for all of those comparisons. 
+
+*Be cautious of papers that measure multiple (or worse, ALL) of the alpha diversity indices and report the ones that are significant (I'm absolutely guilty of doing this before I dug more into these indices to understand them).*
+
+To finish our analysis, let's correct our ANOVA for multiple comparisons. To be as strict as possible, we'll use Bonferroni's correction. Our former critical alpha value was 0.05 (the standard comparison: if the p value < critical alpha, we conclude that as 'significant'). Our new critical alpha will be 0.05 / number of comparisons. 
+
+We'll re-assess both models to see if the p value meets significance after accounting for multiple comparisons:
+
+```{r}
+
+### calculate Bonferonni's correction by hand
+
+# calculate the new critical alpha:
+(alpha.crit = 0.05 / 2)
+
+# assess if our Chao1 model meets the new significance threshold:
+# (warning: base R makes it difficult to extract p values, so this is ugly code)
+summary(modChao)[[1]]$`Pr(>F)`[1] < alpha.crit
+
+# assess if our Shannon model meets the new significance threshold:
+summary(modShan)[[1]]$`Pr(>F)`[1] < alpha.crit
+
+```
+
+Neither are still significant after accounting for multiple comparisons. Therefore, we *should* conclude that alpha diversity is NOT affected by disease state in this study. 
+
+# Publication-ready alpha diversity figures: build a better boxplot
+
+Alpha diversity is super easy to visualize since it's a univariate dataset. We can use the `ggpubr` package and `colorspace` palette to build a colorful, publication-ready figure. 
+
+I always plot faceted figures using a vertical dataset, so we'll start there.
+
+```{r}
+
+## make our dataset vertical and subset for only Chao1 and Shannon's
+alphav <- alpha %>% 
+  select(.sample_name, Chao1, Shannon, DiseaseState) %>% 
+  pivot_longer(cols = c(Shannon, Chao1),
+               names_to = "Index", values_to = "value") %>% 
+  # re-order values to plot in correct order (UC, CD, nonIBD)
+  mutate(Status = recode(DiseaseState,
+                         UC = "UC",
+                         CD = "Crohn's",
+                         nonIBD = "healthy"),
+         Status = factor(Status, ordered = TRUE, 
+                         levels = c("UC", "Crohn's", "healthy")))
+
+```
+
+To build an informative figure, we can use a dotplot that shows the distribution of the data and some other `ggpubr` and `ggplot` tricks to change the default facet labels. Wave goodbye to the days of adding labels with text boxes in Powerpoint!
+
+```{r}
+
+# plot the vertical data 
+ggdotplot(data = alphav, x = "Status", y = "value",
+          # facet by Index and "free" the y scale
+          facet.by = "Index", scales = "free",
+          # color by Status
+          fill = "Status",
+          # remove x and y labels
+          xlab = "", ylab = "",
+          # add an error range
+          add = "mean_sd", 
+          # change size and width of error bars
+          add.params = list(size = 1, width = 0.3),
+          # specify "errorbar" since default is "pointrange"
+          error.plot = "errorbar",
+          # change palette 
+          palette = "Set2",
+          # change the facet labels
+          panel.labs = list(Index = c("A.  Chao1", "B.  Shannon")),
+          # remove facet label background
+          panel.labs.background = list(color = "white", 
+                                       fill = "white"),
+          # change facet labl size and move to the left
+          panel.labs.font = list(size = 12, face = "bold", hjust = 0))
+        
+```
+

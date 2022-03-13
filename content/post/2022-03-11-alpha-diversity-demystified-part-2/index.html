@@ -1,0 +1,686 @@
+---
+title: 'Alpha Diversity Demystified: Part 2'
+author: Emily Van Syoc
+date: '2022-03-11'
+slug: alpha-diversity-demystified-part-2
+categories: []
+tags: []
+subtitle: 'Part 2: Applying alpha diversity to a microbiome'
+summary: "In Part 1, we calculated each common alpha diversity metric by hand and build a fundamental understanding of the differences between 'richness' and 'evenness'. In Part 2, we will apply these  metrics to a realistic microbiome dataset and perform a statistical analysis, resulting in publication-ready results and figures."
+lastmod: '2022-03-11T12:17:42-05:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: no
+projects: []
+# SET AS DRAFT
+draft: true
+output:
+  blogdown::html_page:
+    #code_download: true
+    toc: true
+    #toc_float: true
+    fig_width: 6
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+<ul>
+<li><a href="#alpha-diversity-in-a-real-microbiome">Alpha Diversity in a “real” microbiome</a>
+<ul>
+<li><a href="#whats-our-dataset">What’s our dataset</a>
+<ul>
+<li><a href="#our-research-question">Our research question:</a></li>
+</ul></li>
+<li><a href="#get-alpha-diversity-metrics-with-estimate_richness">Get alpha diversity metrics with <code>estimate_richness</code></a></li>
+<li><a href="#exploratory-analysis-get-to-know-our-data">Exploratory analysis: get to know our data</a>
+<ul>
+<li><a href="#model-diagnostics-chao1">Model Diagnostics: Chao1</a></li>
+</ul></li>
+<li><a href="#build-the-model-chao-1">Build the model: Chao 1</a>
+<ul>
+<li><a href="#model-diagnostics-shannons-h">Model Diagnostics: Shannon’s H</a></li>
+</ul></li>
+<li><a href="#build-the-model-shannons-h-index">Build the model: Shannon’s H index</a></li>
+</ul></li>
+<li><a href="#a-caution-of-multiple-comparisons">A caution of multiple comparisons</a></li>
+<li><a href="#publication-ready-alpha-diversity-figures-build-a-better-boxplot">Publication-ready alpha diversity figures: build a better boxplot</a></li>
+</ul>
+</div>
+
+<div id="alpha-diversity-in-a-real-microbiome" class="section level1">
+<h1>Alpha Diversity in a “real” microbiome</h1>
+<p>In Part 1, we made a very simplistic ‘microbiome’. In Part 2, we’ll work with one of the built-in datasets from the <code>microViz</code> package.</p>
+<div id="whats-our-dataset" class="section level2">
+<h2>What’s our dataset</h2>
+<p>The dataset we’ll use is called “ibd_phylo” from the <code>corncob</code> package. This is from a 2017 dataset and compares 16S data from children with ulcerative colitis and Crohn’s disease, to healthy children.</p>
+<div id="our-research-question" class="section level3">
+<h3>Our research question:</h3>
+<p>Here’s the first version of our research question that you’ll see most often in microbiome papers:
+<strong>Does the gut microbiome of children with ulcerative colitis or Crohn’s disease have lower alpha diversity than the microbiome of healthy children?</strong></p>
+<p>BUT…
+Remember from Part 1 that there are several alpha diversity metrics that estimate richness, evenness, or both. Let’s be a little more specific with our research question and specify the metrics that we’ll use <em>a priori</em>.
+<strong>Does the gut microbiome of children with ulcerative colitis or Crohn’s disease have lower richness (Chao1) or evenness Shannon’s H index) than the microbiome of healthy children?</strong></p>
+<p>First, we’ll install the necessary packages.</p>
+<pre class="r"><code># if needed, install the requisite packages
+install.packages(c(&quot;vegan&quot;, &quot;ggpubr&quot;, &quot;BiocManager&quot;, &quot;tidyverse&quot;, &quot;corncob&quot;, &quot;devtools&quot;, &quot;colorspace&quot;))
+BiocManager::install(&quot;phyloseq&quot;)
+devtools:install_github(&quot;david-barnett/microViz@0.9.0&quot;) # we want the latest version</code></pre>
+<pre class="r"><code># load packages and get the dataset
+library(vegan)
+library(ggpubr)
+library(tidyverse)
+library(corncob)
+library(phyloseq)
+library(microViz)
+library(colorspace)
+
+# get the dataset
+data(ibd_phylo)</code></pre>
+<p>There are 91 samples in the dataset and 36,439 bacterial taxa. The explanatory variable that we’re interested in is called “DiseaseState”. There is one sample categorized as “IBDundef”, so we’ll remove that sample before continuing.
+There are several additional sample variables that we would want to examine for covariates, but to keep this simple we’ll treat it as an ANOVA analysis.</p>
+<pre class="r"><code># what&#39;s in this dataset?
+ibd_phylo</code></pre>
+<pre><code>## phyloseq-class experiment-level object
+## otu_table()   OTU Table:         [ 36349 taxa and 91 samples ]
+## sample_data() Sample Data:       [ 91 samples by 15 sample variables ]
+## tax_table()   Taxonomy Table:    [ 36349 taxa by 7 taxonomic ranks ]</code></pre>
+<pre class="r"><code># how many unique DiseaseStates in the dataset?
+unique(ibd_phylo@sam_data$DiseaseState)</code></pre>
+<pre><code>## [1] &quot;UC&quot;       &quot;nonIBD&quot;   &quot;CD&quot;       &quot;IBDundef&quot;</code></pre>
+<pre class="r"><code>## use &quot;ps_filter&quot; from Microviz to remove the &quot;IBDundef&quot; sample
+ps &lt;- ibd_phylo %&gt;% 
+  microViz::ps_filter(!DiseaseState == &quot;IBDundef&quot;)</code></pre>
+</div>
+</div>
+<div id="get-alpha-diversity-metrics-with-estimate_richness" class="section level2">
+<h2>Get alpha diversity metrics with <code>estimate_richness</code></h2>
+<p>The build-in alpha diversity function in <code>phyloseq</code> is called “estimate_richness”. We’ll calculate all metrics on our dataset. This creates a dataframe that we’ll call “alpha”.</p>
+<p><strong>Remember: alpha diversity is calculated independently for each sample</strong></p>
+<pre class="r"><code>## GET ALPHA DIVERSITY
+
+alpha &lt;- estimate_richness(ps)
+
+# print the first few rows
+knitr::kable(head(alpha))</code></pre>
+<table>
+<colgroup>
+<col width="6%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
+<col width="10%" />
+<col width="9%" />
+<col width="10%" />
+<col width="11%" />
+<col width="10%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="right">Observed</th>
+<th align="right">Chao1</th>
+<th align="right">se.chao1</th>
+<th align="right">ACE</th>
+<th align="right">se.ACE</th>
+<th align="right">Shannon</th>
+<th align="right">Simpson</th>
+<th align="right">InvSimpson</th>
+<th align="right">Fisher</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">X099A</td>
+<td align="right">147</td>
+<td align="right">247.0370</td>
+<td align="right">31.70531</td>
+<td align="right">285.7324</td>
+<td align="right">10.834464</td>
+<td align="right">3.825976</td>
+<td align="right">0.9563395</td>
+<td align="right">22.90401</td>
+<td align="right">50.07430</td>
+</tr>
+<tr class="even">
+<td align="left">X199A</td>
+<td align="right">485</td>
+<td align="right">757.2277</td>
+<td align="right">47.59720</td>
+<td align="right">875.2340</td>
+<td align="right">19.208940</td>
+<td align="right">5.043675</td>
+<td align="right">0.9830860</td>
+<td align="right">59.12263</td>
+<td align="right">177.34145</td>
+</tr>
+<tr class="odd">
+<td align="left">X062B</td>
+<td align="right">214</td>
+<td align="right">342.8864</td>
+<td align="right">33.53602</td>
+<td align="right">390.4389</td>
+<td align="right">12.745577</td>
+<td align="right">3.659049</td>
+<td align="right">0.9316475</td>
+<td align="right">14.63004</td>
+<td align="right">65.50053</td>
+</tr>
+<tr class="even">
+<td align="left">X194A</td>
+<td align="right">308</td>
+<td align="right">670.2326</td>
+<td align="right">79.52786</td>
+<td align="right">689.2209</td>
+<td align="right">16.854429</td>
+<td align="right">4.422342</td>
+<td align="right">0.9635328</td>
+<td align="right">27.42190</td>
+<td align="right">114.58522</td>
+</tr>
+<tr class="odd">
+<td align="left">X166A</td>
+<td align="right">270</td>
+<td align="right">407.9483</td>
+<td align="right">32.62650</td>
+<td align="right">476.3814</td>
+<td align="right">13.986045</td>
+<td align="right">4.235517</td>
+<td align="right">0.9590054</td>
+<td align="right">24.39344</td>
+<td align="right">88.38290</td>
+</tr>
+<tr class="even">
+<td align="left">X219A</td>
+<td align="right">110</td>
+<td align="right">187.7727</td>
+<td align="right">27.51836</td>
+<td align="right">217.7337</td>
+<td align="right">9.027252</td>
+<td align="right">2.498413</td>
+<td align="right">0.7905070</td>
+<td align="right">4.77343</td>
+<td align="right">30.96077</td>
+</tr>
+</tbody>
+</table>
+<p>The dataframe this creates is a little clunky, so we’ll use <code>microViz</code> to add our explanatory variable of interest (DiseaseState). <code>estimate_richness</code> moves the sample names of the phyloseq object to rownames in the dataframe, and adds a leading “X” to the rownames because they are numeric. This adds an extra line of code to wrangle.</p>
+<pre class="r"><code>## Get our explanatory variable added to the alpha dataset
+
+# first, get our sample_data in a dataframe
+sampdf &lt;- samdat_tbl(ps) %&gt;% 
+  # for simplicity, select only the variable of interest
+  select(.sample_name, DiseaseState)
+
+## add our sample data to the alpha dataframe
+alpha &lt;- alpha %&gt;% 
+  # first, fix the rownames issue
+  rownames_to_column(var = &quot;.sample_name&quot;) %&gt;% 
+  mutate(.sample_name = str_remove_all(.sample_name, &quot;^X&quot;)) %&gt;% 
+  # join to the sample data
+  full_join(sampdf, by = &quot;.sample_name&quot;)</code></pre>
+</div>
+<div id="exploratory-analysis-get-to-know-our-data" class="section level2">
+<h2>Exploratory analysis: get to know our data</h2>
+<p>I always like to start with making some plots of the data to look at model diagnostics, get to know the data, and look for any potential issues. <code>phyloseq</code> has a built-in plotting mechanism. Since we chose Chao1 and Shannon’s index, we’ll plot those:</p>
+<pre class="r"><code># plot with phyloseq
+plot_richness(ps, x = &quot;DiseaseState&quot;, color = &quot;DiseaseState&quot;,
+              measures = c(&quot;Shannon&quot;, &quot;Chao1&quot;))</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="576" /></p>
+<p>We’ll also get summary statistics on our data with <code>rstatix</code>:</p>
+<pre class="r"><code># get summary statistics - overall
+knitr::kable(alpha %&gt;% 
+               get_summary_stats(type = &quot;common&quot;))</code></pre>
+<table style="width:100%;">
+<colgroup>
+<col width="14%" />
+<col width="3%" />
+<col width="10%" />
+<col width="11%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="8%" />
+<col width="10%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">variable</th>
+<th align="right">n</th>
+<th align="right">min</th>
+<th align="right">max</th>
+<th align="right">median</th>
+<th align="right">iqr</th>
+<th align="right">mean</th>
+<th align="right">sd</th>
+<th align="right">se</th>
+<th align="right">ci</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">ACE</td>
+<td align="right">90</td>
+<td align="right">112.455</td>
+<td align="right">3566.579</td>
+<td align="right">608.013</td>
+<td align="right">465.654</td>
+<td align="right">867.671</td>
+<td align="right">773.111</td>
+<td align="right">81.493</td>
+<td align="right">161.925</td>
+</tr>
+<tr class="even">
+<td align="left">Chao1</td>
+<td align="right">90</td>
+<td align="right">97.955</td>
+<td align="right">3560.041</td>
+<td align="right">565.861</td>
+<td align="right">487.978</td>
+<td align="right">842.304</td>
+<td align="right">783.259</td>
+<td align="right">82.563</td>
+<td align="right">164.050</td>
+</tr>
+<tr class="odd">
+<td align="left">Fisher</td>
+<td align="right">90</td>
+<td align="right">21.193</td>
+<td align="right">1744.406</td>
+<td align="right">114.709</td>
+<td align="right">106.160</td>
+<td align="right">281.337</td>
+<td align="right">382.587</td>
+<td align="right">40.328</td>
+<td align="right">80.131</td>
+</tr>
+<tr class="even">
+<td align="left">InvSimpson</td>
+<td align="right">90</td>
+<td align="right">3.461</td>
+<td align="right">556.867</td>
+<td align="right">35.273</td>
+<td align="right">35.551</td>
+<td align="right">66.687</td>
+<td align="right">94.427</td>
+<td align="right">9.953</td>
+<td align="right">19.777</td>
+</tr>
+<tr class="odd">
+<td align="left">Observed</td>
+<td align="right">90</td>
+<td align="right">74.000</td>
+<td align="right">3560.000</td>
+<td align="right">296.000</td>
+<td align="right">232.500</td>
+<td align="right">674.344</td>
+<td align="right">851.407</td>
+<td align="right">89.746</td>
+<td align="right">178.324</td>
+</tr>
+<tr class="even">
+<td align="left">se.ACE</td>
+<td align="right">90</td>
+<td align="right">5.396</td>
+<td align="right">19.209</td>
+<td align="right">12.740</td>
+<td align="right">5.486</td>
+<td align="right">12.767</td>
+<td align="right">3.479</td>
+<td align="right">0.367</td>
+<td align="right">0.729</td>
+</tr>
+<tr class="odd">
+<td align="left">se.chao1</td>
+<td align="right">90</td>
+<td align="right">0.000</td>
+<td align="right">110.397</td>
+<td align="right">42.115</td>
+<td align="right">46.945</td>
+<td align="right">39.315</td>
+<td align="right">29.358</td>
+<td align="right">3.095</td>
+<td align="right">6.149</td>
+</tr>
+<tr class="even">
+<td align="left">Shannon</td>
+<td align="right">90</td>
+<td align="right">2.498</td>
+<td align="right">7.617</td>
+<td align="right">4.525</td>
+<td align="right">0.972</td>
+<td align="right">4.718</td>
+<td align="right">1.219</td>
+<td align="right">0.129</td>
+<td align="right">0.255</td>
+</tr>
+<tr class="odd">
+<td align="left">Simpson</td>
+<td align="right">90</td>
+<td align="right">0.711</td>
+<td align="right">0.998</td>
+<td align="right">0.972</td>
+<td align="right">0.027</td>
+<td align="right">0.955</td>
+<td align="right">0.054</td>
+<td align="right">0.006</td>
+<td align="right">0.011</td>
+</tr>
+</tbody>
+</table>
+<p>We can also get summary statistics for our metrics of interest and the explanatory variables:</p>
+<pre class="r"><code># get summary stats
+knitr::kable(alpha %&gt;% 
+  select(DiseaseState, Shannon, Chao1) %&gt;% 
+  group_by(DiseaseState) %&gt;% 
+  get_summary_stats(type = &quot;common&quot;))</code></pre>
+<table>
+<colgroup>
+<col width="14%" />
+<col width="9%" />
+<col width="3%" />
+<col width="8%" />
+<col width="9%" />
+<col width="8%" />
+<col width="8%" />
+<col width="9%" />
+<col width="8%" />
+<col width="8%" />
+<col width="8%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">DiseaseState</th>
+<th align="left">variable</th>
+<th align="right">n</th>
+<th align="right">min</th>
+<th align="right">max</th>
+<th align="right">median</th>
+<th align="right">iqr</th>
+<th align="right">mean</th>
+<th align="right">sd</th>
+<th align="right">se</th>
+<th align="right">ci</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">CD</td>
+<td align="left">Chao1</td>
+<td align="right">23</td>
+<td align="right">251.516</td>
+<td align="right">2395.000</td>
+<td align="right">609.024</td>
+<td align="right">511.899</td>
+<td align="right">854.930</td>
+<td align="right">598.232</td>
+<td align="right">124.740</td>
+<td align="right">258.695</td>
+</tr>
+<tr class="even">
+<td align="left">CD</td>
+<td align="left">Shannon</td>
+<td align="right">23</td>
+<td align="right">3.337</td>
+<td align="right">6.840</td>
+<td align="right">4.635</td>
+<td align="right">0.771</td>
+<td align="right">4.887</td>
+<td align="right">0.971</td>
+<td align="right">0.203</td>
+<td align="right">0.420</td>
+</tr>
+<tr class="odd">
+<td align="left">nonIBD</td>
+<td align="left">Chao1</td>
+<td align="right">24</td>
+<td align="right">122.536</td>
+<td align="right">3560.041</td>
+<td align="right">657.686</td>
+<td align="right">663.580</td>
+<td align="right">1104.011</td>
+<td align="right">999.169</td>
+<td align="right">203.954</td>
+<td align="right">421.912</td>
+</tr>
+<tr class="even">
+<td align="left">nonIBD</td>
+<td align="left">Shannon</td>
+<td align="right">24</td>
+<td align="right">3.124</td>
+<td align="right">7.617</td>
+<td align="right">4.811</td>
+<td align="right">0.902</td>
+<td align="right">5.164</td>
+<td align="right">1.222</td>
+<td align="right">0.250</td>
+<td align="right">0.516</td>
+</tr>
+<tr class="odd">
+<td align="left">UC</td>
+<td align="left">Chao1</td>
+<td align="right">43</td>
+<td align="right">97.955</td>
+<td align="right">3062.000</td>
+<td align="right">421.188</td>
+<td align="right">407.289</td>
+<td align="right">689.481</td>
+<td align="right">709.025</td>
+<td align="right">108.125</td>
+<td align="right">218.206</td>
+</tr>
+<tr class="even">
+<td align="left">UC</td>
+<td align="left">Shannon</td>
+<td align="right">43</td>
+<td align="right">2.498</td>
+<td align="right">7.342</td>
+<td align="right">4.223</td>
+<td align="right">0.962</td>
+<td align="right">4.378</td>
+<td align="right">1.261</td>
+<td align="right">0.192</td>
+<td align="right">0.388</td>
+</tr>
+</tbody>
+</table>
+<p>This dataset is very imbalanced (almost double the number of subjects with ulcerative colitis compared to healthy &amp; Crohn’s!) but we’ll ignore that for now…</p>
+<div id="model-diagnostics-chao1" class="section level3">
+<h3>Model Diagnostics: Chao1</h3>
+<p>Let’s build a linear model for Chao1 and test it for parametric fit.</p>
+<pre class="r"><code># build a test model 
+testmod &lt;- lm(Chao1 ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod) # base R&#39;s built-in diagnostic plots</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="576" /></p>
+<pre class="r"><code># plot a histogram of residuals
+hist(resid(testmod), main = &quot;Residual histogram&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-2.png" width="576" /></p>
+<p>There’s some issues with normality (shown by the QQ-plot and histogram). Let’s try a log transformation:</p>
+<pre class="r"><code># log transform the dependent variable
+testmod1 &lt;- lm(log1p(Chao1) ~ DiseaseState, data = alpha)
+
+## examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod1) # base R&#39;s built-in diagnostic plots</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="576" /></p>
+<pre class="r"><code># plot a histogram of residuals
+dev.off()</code></pre>
+<pre><code>## null device 
+##           1</code></pre>
+<pre class="r"><code>hist(resid(testmod1), main = &quot;Residual histogram of log transformation&quot;)</code></pre>
+<p>This looks better! We’ll do our ANOVA with a log transformation.</p>
+</div>
+</div>
+<div id="build-the-model-chao-1" class="section level2">
+<h2>Build the model: Chao 1</h2>
+<pre class="r"><code>## perform ANOVA test (with base R)
+modChao &lt;- aov(log1p(Chao1) ~ DiseaseState, data = alpha)
+
+# get the summary
+summary(modChao)</code></pre>
+<pre><code>##              Df Sum Sq Mean Sq F value Pr(&gt;F)  
+## DiseaseState  2   4.47  2.2355   3.544 0.0332 *
+## Residuals    87  54.88  0.6309                 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<p>The ANOVA is significant, let’s take a look at the Tukey’s post-hoc test:</p>
+<pre class="r"><code># Tukey&#39;s post hoc
+TukeyHSD(modChao)</code></pre>
+<pre><code>##   Tukey multiple comparisons of means
+##     95% family-wise confidence level
+## 
+## Fit: aov(formula = log1p(Chao1) ~ DiseaseState, data = alpha)
+## 
+## $DiseaseState
+##                 diff        lwr          upr     p adj
+## nonIBD-CD  0.1016032 -0.4510338  0.654240204 0.8996179
+## UC-CD     -0.3882394 -0.8774934  0.101014604 0.1470346
+## UC-nonIBD -0.4898426 -0.9724102 -0.007275027 0.0458330</code></pre>
+<p>There is only a difference between ulcerative colitis and healthy (non-IBD) samples. Let’s plot that to examine - instead of a boxplot, we’ll use a violin plot that shows the distribution of the data. Since we log transformed our data, we can also plot the log transformation with <code>ggpar</code>.</p>
+<pre class="r"><code># create a violin plot in ggpubr
+plot1 &lt;- ggviolin(data = alpha, x = &quot;DiseaseState&quot;, y = &quot;Chao1&quot;, 
+                  # color by DiseaseState
+          fill = &quot;DiseaseState&quot;,
+          # add the data points
+          add = &quot;jitter&quot;)
+
+# transform the y axis to log 10
+ggpar(plot1, yscale = &quot;log10&quot;, format.scale = TRUE,
+      ylab = &quot;log(Chao1&quot;) </code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-13-1.png" width="576" /></p>
+<p>Looks good! After this analysis, we would conclude that the gut microbiome of the children in the study had lower richness than healthy children (F<sub>2</sub>,<sub>87</sub> = 3.544, Tukey post hoc adjusted p = 0.046) and there were no differences between children with Crohn’s Disease and healthy children (Tukey post hoc adjusted p = 0.900) or between Crohn’s Disease and ulcerative colitis (Tukey post hoc adjusted p = 0.147).</p>
+<div id="model-diagnostics-shannons-h" class="section level3">
+<h3>Model Diagnostics: Shannon’s H</h3>
+<p>We’ll repeat this process for Shannon’s index. Let’s build a linear model for Shannon’s index and test it for parametric fit.</p>
+<pre class="r"><code># build a test model 
+testmod &lt;- lm(Shannon ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod) # base R&#39;s built-in diagnostic plots</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-14-1.png" width="576" /></p>
+<pre class="r"><code># plot a histogram of residuals
+hist(resid(testmod), main = &quot;Residual histogram&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-14-2.png" width="576" /></p>
+<p>This doesn’t look awful, but it’s not fantastic… let’s try a log transformation.</p>
+<pre class="r"><code># build a test model with a log transformation
+testmod1 &lt;- lm(log1p(Shannon) ~ DiseaseState, data = alpha)
+
+# examine model diagnostics
+par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
+plot(testmod1) # base R&#39;s built-in diagnostic plots</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-15-1.png" width="576" /></p>
+<pre class="r"><code># plot a histogram of residuals
+dev.off()</code></pre>
+<pre><code>## null device 
+##           1</code></pre>
+<pre class="r"><code>hist(resid(testmod1), main = &quot;Residual histogram with log transformation&quot;)</code></pre>
+<p>Eh, not a huge improvement. We’ll use the un-transformed data and proceed.</p>
+</div>
+</div>
+<div id="build-the-model-shannons-h-index" class="section level2">
+<h2>Build the model: Shannon’s H index</h2>
+<pre class="r"><code>## perform ANOVA test (with base R)
+modShan &lt;- aov(Shannon ~ DiseaseState, data = alpha)
+
+# get the summary
+summary(modShan)</code></pre>
+<pre><code>##              Df Sum Sq Mean Sq F value Pr(&gt;F)  
+## DiseaseState  2   10.4   5.198   3.709 0.0284 *
+## Residuals    87  121.9   1.401                 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<p>This model is also significant. Let’s look at the post-hoc test:</p>
+<pre class="r"><code># Tukey&#39;s post-hoc test
+TukeyHSD(modShan)</code></pre>
+<pre><code>##   Tukey multiple comparisons of means
+##     95% family-wise confidence level
+## 
+## Fit: aov(formula = Shannon ~ DiseaseState, data = alpha)
+## 
+## $DiseaseState
+##                 diff        lwr         upr     p adj
+## nonIBD-CD  0.2763316 -0.5472951  1.09995820 0.7040143
+## UC-CD     -0.5092856 -1.2384489  0.21987772 0.2243157
+## UC-nonIBD -0.7856172 -1.5048153 -0.06641904 0.0288513</code></pre>
+<p>Similarly to Chao1, we see a difference only between ulcerative colitis and healthy samples. Let’s plot this:</p>
+<pre class="r"><code># create a violin plot in ggpubr
+ggviolin(data = alpha, x = &quot;DiseaseState&quot;, y = &quot;Shannon&quot;, 
+                  # color by DiseaseState
+          fill = &quot;DiseaseState&quot;,
+          # add the data points
+          add = &quot;jitter&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-18-1.png" width="576" /></p>
+<p>Looks good! After this analysis, we would conclude that the gut microbiome of the children in the study had lower evenness than healthy children (F<sub>2</sub>,<sub>87</sub> = 3.709, Tukey post hoc adjusted p = 0.0289) and there were no differences between children with Crohn’s Disease and healthy children (Tukey post hoc adjusted p = 0.704) or between Crohn’s Disease and ulcerative colitis (Tukey post hoc adjusted p = 0.224).</p>
+</div>
+</div>
+<div id="a-caution-of-multiple-comparisons" class="section level1">
+<h1>A caution of multiple comparisons</h1>
+<p>Keep in mind that we’re using these TWO metrics to describe ONE parameter: alpha diversity. Technically, that’s a violation of multiple comparisons. We should be correcting our analyses for 2 comparisons. What if we decided to analyze a few more metrics, like Shannon’s and Simpson’s, or Simpson’s and Inverse Simpson’s?</p>
+<p>One, those all tell us different versions of the same story, so using more than one is not necessarily informative. Two, we now need to account for all of those comparisons.</p>
+<p><em>Be cautious of papers that measure multiple (or worse, ALL) of the alpha diversity indices and report the ones that are significant (I’m absolutely guilty of doing this before I dug more into these indices to understand them).</em></p>
+<p>To finish our analysis, let’s correct our ANOVA for multiple comparisons. To be as strict as possible, we’ll use Bonferroni’s correction. Our former critical alpha value was 0.05 (the standard comparison: if the p value &lt; critical alpha, we conclude that as ‘significant’). Our new critical alpha will be 0.05 / number of comparisons.</p>
+<p>We’ll re-assess both models to see if the p value meets significance after accounting for multiple comparisons:</p>
+<pre class="r"><code>### calculate Bonferonni&#39;s correction by hand
+
+# calculate the new critical alpha:
+(alpha.crit = 0.05 / 2)</code></pre>
+<pre><code>## [1] 0.025</code></pre>
+<pre class="r"><code># assess if our Chao1 model meets the new significance threshold:
+# (warning: base R makes it difficult to extract p values, so this is ugly code)
+summary(modChao)[[1]]$`Pr(&gt;F)`[1] &lt; alpha.crit</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<pre class="r"><code># assess if our Shannon model meets the new significance threshold:
+summary(modShan)[[1]]$`Pr(&gt;F)`[1] &lt; alpha.crit</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<p>Neither are still significant after accounting for multiple comparisons. Therefore, we <em>should</em> conclude that alpha diversity is NOT affected by disease state in this study.</p>
+</div>
+<div id="publication-ready-alpha-diversity-figures-build-a-better-boxplot" class="section level1">
+<h1>Publication-ready alpha diversity figures: build a better boxplot</h1>
+<p>Alpha diversity is super easy to visualize since it’s a univariate dataset. We can use the <code>ggpubr</code> package and <code>colorspace</code> palette to build a colorful, publication-ready figure.</p>
+<p>I always plot faceted figures using a vertical dataset, so we’ll start there.</p>
+<pre class="r"><code>## make our dataset vertical and subset for only Chao1 and Shannon&#39;s
+alphav &lt;- alpha %&gt;% 
+  select(.sample_name, Chao1, Shannon, DiseaseState) %&gt;% 
+  pivot_longer(cols = c(Shannon, Chao1),
+               names_to = &quot;Index&quot;, values_to = &quot;value&quot;) %&gt;% 
+  # re-order values to plot in correct order (UC, CD, nonIBD)
+  mutate(Status = recode(DiseaseState,
+                         UC = &quot;UC&quot;,
+                         CD = &quot;Crohn&#39;s&quot;,
+                         nonIBD = &quot;healthy&quot;),
+         Status = factor(Status, ordered = TRUE, 
+                         levels = c(&quot;UC&quot;, &quot;Crohn&#39;s&quot;, &quot;healthy&quot;)))</code></pre>
+<p>To build an informative figure, we can use a dotplot that shows the distribution of the data and some other <code>ggpubr</code> and <code>ggplot</code> tricks to change the default facet labels. Wave goodbye to the days of adding labels with text boxes in Powerpoint!</p>
+<pre class="r"><code># plot the vertical data 
+ggdotplot(data = alphav, x = &quot;Status&quot;, y = &quot;value&quot;,
+          # facet by Index and &quot;free&quot; the y scale
+          facet.by = &quot;Index&quot;, scales = &quot;free&quot;,
+          # color by Status
+          fill = &quot;Status&quot;,
+          # remove x and y labels
+          xlab = &quot;&quot;, ylab = &quot;&quot;,
+          # add an error range
+          add = &quot;mean_sd&quot;, 
+          # change size and width of error bars
+          add.params = list(size = 1, width = 0.3),
+          # specify &quot;errorbar&quot; since default is &quot;pointrange&quot;
+          error.plot = &quot;errorbar&quot;,
+          # change palette 
+          palette = &quot;Set2&quot;,
+          # change the facet labels
+          panel.labs = list(Index = c(&quot;A.  Chao1&quot;, &quot;B.  Shannon&quot;)),
+          # remove facet label background
+          panel.labs.background = list(color = &quot;white&quot;, 
+                                       fill = &quot;white&quot;),
+          # change facet labl size and move to the left
+          panel.labs.font = list(size = 12, face = &quot;bold&quot;, hjust = 0))</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-21-1.png" width="576" /></p>
+</div>
