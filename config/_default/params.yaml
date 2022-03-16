@@ -5,10 +5,10 @@
 
 # Appearance
 
-theme: minimal
+theme: Earth
 day_night: false
 font: ''
-font_size: L
+font_size: m
 
 # SEO
 
@@ -21,7 +21,7 @@ twitter: ''
 # Contact (edit or remove options as required)
 
 email: vansyoc@psu.edu
-phone: 
+#phone: 
 address:
   street: 
   city: University Park
@@ -29,29 +29,21 @@ address:
   postcode: '16801'
   country: United States
   country_code: US
-coordinates:
-  latitude: 
-  longitude: 
-directions: 
-office_hours:
-appointment_url: 
+#coordinates:
+ # latitude: 
+  #longitude: 
+#directions: 
+#office_hours:
+#appointment_url: 
 contact_links:
-  - icon: twitter
+  - icon: github
     icon_pack: fab
-    name: DM Me
-    link: 'https://twitter.com/Twitter'
-  - icon: skype
-    icon_pack: fab
-    name: Skype Me
-    link: 'skype:echo123?call'
-  - icon: keybase
-    icon_pack: fab
-    name: Chat on Keybase
-    link: 'https://keybase.io/'
-  - icon: comments
+    name: Open a Github issue
+    link: 'https://github.com/EmilyB17/microbiome-demystified'
+  - icon: users
     icon_pack: fas
-    name: Discuss on Forum
-    link: 'https://discourse.gohugo.io'
+    name: Ganda Lab 
+    link: 'https://gandalab.org'
 
 # Site header
 
@@ -78,7 +70,7 @@ highlight_languages:
   - python
   - latex
 math: true
-diagram: false
+diagram: true
 privacy_pack: false
 edit_page:
   repo_url: ''

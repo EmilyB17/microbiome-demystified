@@ -1,5 +1,5 @@
 ---
-bio: I'm PhD student with a passion for bridging scientific disciplines and making 
+bio: Making microbiome science accessible.
 education:
   courses:
   - course: Dual-title Ph.D. in Integrative & Biomedical Physiology and Clinical & Translational Sciences 
@@ -31,8 +31,8 @@ social:
   icon_pack: fab
   label: Follow me on Twitter
   link: https://twitter.com/emilybean017
-- icon: graduation-cap
-  icon_pack: fas
+- icon: orcid
+  icon_pack: ai
   link: https://orcid.org/0000-0002-9984-534X
 - icon: github
   icon_pack: fab
@@ -48,4 +48,3 @@ I'm PhD student in Integrative & Biomedical Physiology and Clinical & Translatio
 
 Microbiome research is everywhere. Next-gen sequencing data is ubiquitous, and descriptive microbiome studies can be found for every scientific niche. However, this type of ‘omics data is complex and inaccessible to everyday biologists who have only experienced “traditional” stats. This website is intended to serve as a tool for scientists at every level who want to truly demystify and understand the world of microbiome informatics and analyses. Along the way, we’ll tackle some R code to make these analyses easy and reproducible. I’ll include tutorials on publication-ready figures, good coding practices, workflows for bigger data, and doing robust statistical analyses. This website is intended to serve the needs of someone with minimal R and microbiome experience, up to the level of an experienced coder who wants a more in-depth understanding of microbiome analyses. 
 
-{{< icon name="download" pack="fas" >}} Download my {{< staticref "uploads/resume.pdf" "newtab" >}}resumé{{< /staticref >}}.
