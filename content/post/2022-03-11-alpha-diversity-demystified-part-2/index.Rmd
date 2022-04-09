@@ -32,6 +32,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 In Part 1, we made a very simplistic 'microbiome'. In Part 2, we'll work with one of the built-in datasets from the `microViz` package. 
 
+
 ## What's our dataset
 
 The dataset we'll use is called "ibd_phylo" from the `corncob` package. This is from a 2017 dataset and compares 16S data from children with ulcerative colitis and Crohn's disease, to healthy children.

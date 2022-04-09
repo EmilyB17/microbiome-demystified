@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 # What is alpha diversity
 
-If you have read a microbiome paper, chances are the authors have quantified the microbiome in terms of "alpha diversity" and "beta diversity" - sometimes also called "within-sample diversity" and "between-sample diversity", respectively. These terms were coined by Robert Whittaker in 1972 and have become ubiquitous in microbiome research [@whittaker1972]. 
+If you have read a microbiome paper, chances are you've come across the terms "alpha diversity" and "beta diversity" - sometimes also called "within-sample diversity" and "between-sample diversity", respectively. These terms were coined by Robert Whittaker in 1972 and have become ubiquitous in microbiome research [@whittaker1972]. 
 
 There are two ways to think about alpha diversity: *richness* and *evenness*. However, in the scientific literature we don't usually use those terms directly; instead, alpha diversity is calculated in different indices that consider richness, evenness, or both. You have probably seen terms like Shannon's H index, Simpson's diversity, Chao1, and number of taxa. 
 
