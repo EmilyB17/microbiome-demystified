@@ -3,10 +3,10 @@ title: 'Alpha Diversity Demystified: Part 2'
 author: Emily Van Syoc
 date: '2022-03-11'
 slug: alpha-diversity-demystified-part-2
-categories: []
+categories: [tutorials]
 tags: []
-subtitle: 'Part 2: Applying alpha diversity to a microbiome'
-summary: "In Part 1, we calculated each common alpha diversity metric by hand and build a fundamental understanding of the differences between 'richness' and 'evenness'. In Part 2, we will apply these  metrics to a realistic microbiome dataset and perform a statistical analysis, resulting in publication-ready results and figures."
+subtitle: 'Part 2: How do we use alpha diversity?'
+summary: "Apply a real-life statistical analysis to alpha diversity calculated on a 16S dataset."
 lastmod: '2022-03-11T12:17:42-05:00'
 featured: no
 image:
@@ -15,7 +15,7 @@ image:
   preview_only: no
 projects: []
 # SET AS DRAFT
-draft: true
+draft: false
 output:
   blogdown::html_page:
     #code_download: true

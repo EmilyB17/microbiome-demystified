@@ -1,3 +1,7 @@
 {{ if eq hugo.Environment "production" }}
   <script async defer src="https://buttons.github.io/buttons.js"></script>
 {{end}}
+
+{{ if (findRE "<pre" .Content 1) }}
+    <script src="/js/clipboard.js"></script>
+{{ end }}
