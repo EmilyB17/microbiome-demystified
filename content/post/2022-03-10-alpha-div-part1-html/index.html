@@ -10,10 +10,13 @@ summary: 'Learn the basics of richness and evenness with a simplified microbiome
 authors: []
 lastmod: '2022-03-10T21:24:34-05:00'
 featured: no
+share: true
+commentable: true
 image:
   caption: ''
   focal_point: ''
   preview_only: no
+bibliography: biblio.bib
 projects: []
 output:
   blogdown::html_page:
@@ -28,7 +31,7 @@ output:
 <ul>
 <li><a href="#what-is-alpha-diversity">What is alpha diversity</a>
 <ul>
-<li><a href="#how-well-go-through-the-basics">How we’ll go through the basics</a></li>
+<li><a href="#how-do-we-understand-alpha-diversity-indices">How do we understand alpha diversity indices?</a></li>
 <li><a href="#what-you-need-to-follow-this-guide">What you need to follow this guide</a></li>
 </ul></li>
 <li><a href="#creating-a-simplistic-data-set">Creating a simplistic data set</a></li>
@@ -55,31 +58,36 @@ output:
 <li><a href="#whats-the-difference-between-inverse-simpson-and-simpson">What’s the difference between Inverse Simpson and Simpson?</a></li>
 </ul></li>
 <li><a href="#comparing-evenness-estimates">Comparing evenness estimates</a></li>
+<li><a href="#which-one-do-i-choose">Which one do I choose?</a></li>
+<li><a href="#next-put-this-into-practice">Next: Put this into practice!</a></li>
 </ul></li>
 </ul>
 </div>
 
 <div id="what-is-alpha-diversity" class="section level1">
 <h1>What is alpha diversity</h1>
-<p>If you have read a microbiome paper, chances are you’ve come across the terms “alpha diversity” and “beta diversity” - sometimes also called “within-sample diversity” and “between-sample diversity”, respectively. These terms were coined by Robert Whittaker in 1972 and have become ubiquitous in microbiome research <span class="citation">[@whittaker1972]</span>.</p>
-<p>There are two ways to think about alpha diversity: <em>richness</em> and <em>evenness</em>. However, in the scientific literature we don’t usually use those terms directly; instead, alpha diversity is calculated in different indices that consider richness, evenness, or both. You have probably seen terms like Shannon’s H index, Simpson’s diversity, Chao1, and number of taxa.</p>
-<p>What is the difference between all of these, and more importantly - <strong>how do we choose the appropriate alpha diversity index for our analysis?</strong> Buckle up and come with me as we dive in.</p>
-<p><a href="https://giphy.com/clips/thefastsaga-fast-and-furious-saga-6-X0Xt7BxFrgVcez6B69"></a></p>
-<div id="how-well-go-through-the-basics" class="section level2">
-<h2>How we’ll go through the basics</h2>
-<p>We’ll use the <code>phyloseq</code> R package, which is mostly composed of wrapper for the <code>vegan</code> package. We’ll create a simplified microbiome for two fake people, and dig all the way into <code>vegan</code> source code to calculate these indices by hand (it’s not as scary as it sounds!). Finally, we’ll talk about the differences between commonly used alpha diversity indices, how to apply appropriate statistical analyses, and if they violate the concept of compositional analysis (spoiler alert…).</p>
+<p>If you have read a microbiome paper, chances are you’ve come across the terms “alpha diversity” and “beta diversity” - sometimes also called “within-sample diversity” and “between-sample diversity”, respectively. These terms were coined by Robert Whittaker in 1972 and have become ubiquitous in microbiome research <span class="citation">(<a href="#ref-whittaker1972" role="doc-biblioref">Whittaker 1972</a>)</span>.</p>
+<p>Alpha diversity means two things: <em>richness</em> and <em>evenness</em>. However, we don’t usually use those terms directly; instead, alpha diversity is calculated in different indices that consider richness, evenness, or both. You’ve probably seen these indices before but may not know how they differ.</p>
+<p>So, <strong>how do we choose the appropriate alpha diversity index for our analysis?</strong></p>
+<div id="how-do-we-understand-alpha-diversity-indices" class="section level2">
+<h2>How do we understand alpha diversity indices?</h2>
+<p>We’ll create a simplified microbiome for two fake people, and dig all the way into <code>vegan</code> source code to calculate these indices by hand (it’s not as scary as it sounds!). Then, we’ll discuss the differences between commonly used alpha diversity indices, how to apply appropriate statistical analyses, and if they violate the concept of compositional analysis (spoiler alert…).</p>
 </div>
 <div id="what-you-need-to-follow-this-guide" class="section level2">
 <h2>What you need to follow this guide</h2>
-<p>Ideally, you will have at least basic experience in R. My code is written with tidy methods and we usually start with a phyloseq object. If you’re following along in your own R session, install phyloseq (Bioconductor), vegan (CRAN), tidyverse (CRAN), and ggpubr (CRAN) first.</p>
+<p>Ideally, you will have at least basic experience in R. My code is written with tidy methods and we will start with a phyloseq object. If you’re following along in your own R session, install these packages first using the code chunk below.</p>
 <pre class="r"><code># if needed, install the requisite packages
+
+# CRAN installs
 install.packages(c(&quot;vegan&quot;, &quot;ggpubr&quot;, &quot;BiocManager&quot;, &quot;tidyverse&quot;))
+
+# Bioconductor installs
 BiocManager::install(&quot;phyloseq&quot;)</code></pre>
 </div>
 </div>
 <div id="creating-a-simplistic-data-set" class="section level1">
 <h1>Creating a simplistic data set</h1>
-<p>To illustrate these indices, let’s start by creating a very basic datset to use. We’ll create a fake microbiome for two fake people, Jenny and Sarah. We’ll pretend that there are 3 bacteria in their microbiome: Taxa A, Taxa B, and Taxa C.</p>
+<p>Let’s create an overly simplistic microbiome for two fake people, Jenny and Sarah. There are 3 bacteria in their microbiome; Taxa A, Taxa B, and Taxa C.</p>
 <pre class="r"><code># first, load the requisite packages
 library(phyloseq)
 library(vegan)
@@ -100,7 +108,7 @@ otu &lt;- phyloseq::otu_table(samples, taxa_are_rows = FALSE)</code></pre>
 <div id="estimate-alpha-diversity-in-phyloseq" class="section level1">
 <h1>Estimate alpha diversity in phyloseq</h1>
 <p>Phyloseq has a function called <code>estimate_richness()</code> that calculates commonly used alpha diversity indices. By default, it returns Observed Taxa, Chao1, se.chao1, ACE, se.ACE, Shannon, Simpson, Inverse Simpson, and Fisher.</p>
-<p>If we look at the help page for <code>estimate_richness()</code>, it shows us that the internal functions are in <code>vegan</code>: <code>estimateR</code>, <code>diversity</code>, and <code>fisherfit</code>. The <code>estimateR</code> help page shows the equations used for Chao1 and ACE, and <code>diversity</code> shows the equations for Shannon, Simpson, and Inverse Simpson. <code>fisherfit</code> uses a model fit function from <code>fisher.alpha</code> which is a little complex for this guide. We’ll focus on the indices that are easily calculated from the OTU table input.</p>
+<p>If we look at the help page for <code>estimate_richness()</code>, it shows us that the internal functions are from <code>vegan</code>: <code>estimateR</code>, <code>diversity</code>, and <code>fisherfit</code>. The <code>estimateR</code> help page shows the equations used for Chao1 and ACE, and <code>diversity</code> shows the equations for Shannon, Simpson, and Inverse Simpson. <code>fisherfit</code> uses a model fit function from <code>fisher.alpha</code> which is a little complex for this guide. We’ll focus on the indices that are easily calculated from the OTU table input.</p>
 <pre class="r"><code># open help page for estimate_richness
 ?phyloseq::estimate_richness
 
@@ -171,10 +179,12 @@ knitr::kable(alpha)</code></pre>
 </div>
 <div id="richness-indices-observed-taxa-chao1-and-ace" class="section level1">
 <h1>Richness indices: Observed taxa, Chao1, and ACE</h1>
-<p>“Richness” can be thought of as simply “the number of species”. These indices emerged for field biologists to quantify the number of species in a sample <span class="citation">[@ohara2005]</span>. You can think of this as counting numbers of tigers in a jungle. Observed Taxa is straightforward - it is the true richness estimate and simply the number of taxa detected in a sample. Chao1 and ACE are <strong>non-parametric estimators</strong> that derive the “true” richness in a sample from an equation. These functions are estimators that rely on one simple assumption: the true number of tigers present in the jungle is always higher than the number of tigers you have actually managed to capture. Anne Chao called this “capture heterogeneity” <span class="citation">[@chao1987]</span>. Chao1 and ACE both estimate the number of “rare” species in order to extrapolate the true richness. <em>This is why Chao1 and ACE have standard error estimates but Observed Taxa does not</em>; Observed Taxa is a count, while Chao1 and ACE are estimators.</p>
+<p>“Richness” can be thought of as simply “the number of species”. These indices emerged for field biologists to quantify the number of species in a sample <span class="citation">(<a href="#ref-ohara2005" role="doc-biblioref">O’Hara 2005</a>)</span>. You can think of this as counting the number of tigers in a jungle.</p>
+<p>Observed Taxa is straightforward - it is the absolute richness value, which is simply the number of taxa detected in a sample. Chao1 and ACE are <strong>non-parametric estimators</strong> that derive the “true” richness in a sample from an equation. These functions are estimators that rely on one simple assumption: the true number of tigers present in the jungle is always higher than the number of tigers you have actually managed to capture. Anne Chao called this “capture heterogeneity” <span class="citation">(<a href="#ref-chao1987" role="doc-biblioref">Chao 1987</a>)</span>. Chao1 and ACE both estimate the number of “rare” species in order to extrapolate the true richness.</p>
+<p><em>This is why Chao1 and ACE have standard error estimates but Observed Taxa does not: Observed Taxa is a count, while Chao1 and ACE are estimators.</em></p>
 <div id="observed-taxa" class="section level2">
 <h2>Observed Taxa</h2>
-<p>“Observed Taxa” is also referred to as “number of species” or simply “richness”. It is exactly what it sounds like - the number of species detected in a sample.</p>
+<p>“Observed Taxa” is also called “number of species” or simply “richness”. It is exactly what it sounds like - the number of species detected in a sample.</p>
 <pre class="r"><code>## calculate Observed Taxa for Jenny
 
 # first, subset our dataframe to Jenny&#39;s microbiome
@@ -192,32 +202,27 @@ plot.dat &lt;- alpha %&gt;%
   rownames_to_column(var = &quot;Sample&quot;)
 
 # plot
-ggscatter(data = plot.dat, x = &quot;Sample&quot;, y = &quot;Observed&quot;, color = &quot;Sample&quot;)</code></pre>
+ggscatter(data = plot.dat, x = &quot;Sample&quot;, y = &quot;Observed&quot;, 
+          size = 3,
+          color = &quot;Sample&quot;,
+          subtitle = &quot;Jenny has 1.5 times the number of taxa as Sarah&quot;)</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="576" /></p>
-<pre class="r"><code>## what is the fold change between Jenny and Sarah?
-
-# get Sarah&#39;s microbiome
-sarah &lt;- samples[2,]
-
-# calculate the fold change
-(length(jenny[jenny &gt; 0]) / length(sarah[sarah &gt; 0]))</code></pre>
-<pre><code>## [1] 1.5</code></pre>
 <div id="what-is-the-problem-here" class="section level3">
 <h3>What is the problem here?</h3>
-<p>There’s some issues to contend with, mostly dealing with the idea of sequencing depth or <em>compositionality</em>. Microbiome data comes from a sequencer, which has as limited number of slots. You can think of sequencing data as a bunch of little bugs vying for a spot on the sequencing bus. Only so many bugs will get a seat! Therefore, <strong>we can’t conclude if Jenny’s microbiome truly has more bacterial species than Sarah’s, or if the species in Sarah’s microbiome are rarer and were not sequenced</strong>. Additionally, samples with deeper sequencing are more likely to have more taxa detected.</p>
+<p>There’s some issues to contend with, mostly dealing with the idea of sequencing depth and compositionality. Microbiome data comes from a sequencer, which has as limited number of slots. You can think of sequencing data as a bunch of little bugs vying for a spot on the sequencing bus. Only so many bugs will get a seat! Therefore, <strong>we can’t conclude if Jenny’s microbiome truly has more bacterial species than Sarah’s, or if the species in Sarah’s microbiome are rarer and were not sequenced</strong>. Additionally, samples with deeper sequencing are more likely to have more taxa detected.</p>
 <p>Also, keep in mind that richness doesn’t tell us anything about <strong>abundance</strong> or <strong>functionality</strong>.</p>
 <p>Finally, the effect size here is important. We may see a 1.5 fold change between Jenny and Sarah, but the reality is that they differ by 1 species. Is that a biologically meaningful effect size?</p>
 </div>
 </div>
 <div id="chao1" class="section level2">
 <h2>Chao1</h2>
-<p>Anne Chao described an equation for richness in 1987 for field biologists, and the equation has evolved in the decades since <span class="citation">[@chao1987]</span>. The general idea of this equation is that in a closed population, capture probability is heterogeneous; that is, not all capture times and capture locations result in the same number of captures. There will be a number of species that remain uncaptured. Chao1 seeks to estimate the “true” richness of a sample given this assumption.</p>
-<p>How does this translate to microbial ecology? Chao1 uses the “frequency of species” to <strong>extrapolate richness</strong>. This is different than Observed Taxa because in Chao1, <em>we are estimating the “true” richness given the parameters</em>. This is why Chao1 is given a standard error estimate (which <code>phyloseq</code> and <code>vegan</code> prints as <code>se.Chao1</code>).</p>
-<p>The equation for Chao1 in the <code>estimateR</code> help page is actually slightly different than the equation in the <code>vegan</code> source code. In the source code, the Chao1 equation is:
-<span class="math display">\[
+<p>Anne Chao described an equation for richness in 1987 for field biologists, and the equation has evolved in the decades since <span class="citation">(<a href="#ref-chao1987" role="doc-biblioref">Chao 1987</a>)</span>. The general idea of this equation is that in a closed population, capture probability is heterogeneous; that is, not all capture times and capture locations result in the same number of captures. Most importantly, there will be a number of species that remain uncaptured. Chao1 seeks to estimate the “true” richness of a sample given this assumption.</p>
+<p>How does this translate to microbial ecology? Chao1 uses the “frequency of species” to extrapolate richness. This is different than Observed Taxa because in Chao1, <em>we are estimating the “true” richness given the parameters</em>. This is why Chao1 has a standard error estimate (which <code>phyloseq</code> and <code>vegan</code> prints as <code>se.Chao1</code>).</p>
+<p>The equation for Chao1 in the <code>estimateR</code> help page is actually slightly different than the equation in the <code>vegan</code> source code. In the source code, the Chao1 equation is:</p>
+<p><span class="math display">\[
 Chao1 = S_0 + SSC * \frac{a1 * (a1 - 1)}{\frac{a2 + 1}{2}}
 \]</span>
-where <em>S_0</em> is the total observed species, <em>SSC</em> is a “small sample correction”, <em>a1</em> is the number of singletons (taxa observed only once), and <em>a2</em> is the number of doubletons (taxa observed only twice).</p>
+where <span class="math inline">\(S_0\)</span> is the total observed species, <span class="math inline">\(SSC\)</span> is a “small sample correction”, <span class="math inline">\(a1\)</span> is the number of singletons (taxa observed only once), and <span class="math inline">\(a2\)</span> is the number of doubletons (taxa observed only twice).</p>
 <p>In the code chunk below, the Chao1 equation is taken directly from the <a href="https://github.com/vegandevs/vegan/blob/master/R/estimateR.default.R">vegan source code</a>. We’ll calculate Chao1 by hand for Jenny’s microbiome and compare this to the <code>phyloseq</code> output.</p>
 <pre class="r"><code>## calculate CHAO1 for Jenny
 
@@ -245,13 +250,13 @@ identical(chao1, alpha$Observed[1])</code></pre>
 </div>
 <div id="ace" class="section level2">
 <h2>ACE</h2>
-<p>The ACE index, or “Abundance Coverage Estimator”, relies on the same assumption as Chao1; that in a community of a fixed size, we can only sample so many species and must extrapolate to quantify the true richness of the community <span class="citation">[@ohara2005]</span>. ACE is a variant of Chao1.</p>
-<p>Here’s one key difference: <em>ACE sets an arbitrary threshold to determine which species are considered “rare”</em>. In <code>vegan</code>, this threshold is 10. This means that any taxa with abundance less than or equal to 10 is considered “rare”, and any species with abundance over 10 is considered “abundant”.</p>
+<p>The ACE index, or “Abundance Coverage Estimator”, relies on the same assumption as Chao1; that in a community of a fixed size, we can only sample so many species and must extrapolate to quantify the true richness of the community <span class="citation">(<a href="#ref-ohara2005" role="doc-biblioref">O’Hara 2005</a>)</span>. ACE is a variant of Chao1.</p>
+<p>Here’s one key difference: <strong>ACE sets an arbitrary threshold to determine which species are considered “rare”</strong>. In <code>vegan</code>, this threshold is 10. This means that any taxa with abundance less than or equal to 10 is considered “rare”, and any species with abundance over 10 is considered “abundant”.</p>
 <p>Here is the ACE equation from the <a href="https://github.com/vegandevs/vegan/blob/master/R/estimateR.default.R">vegan source code</a>:</p>
 <p><span class="math display">\[
 ACE = S.abund + \frac{S.rare}{C.ace} + max(\gamma, 0) * \frac{a1}{C.ace}
 \]</span>
-Where <em>S.abund</em> is the number of “abundant” taxa, <em>S.rare</em> is the number of “rare” taxa, and <em>N.rare</em> is the number of individuals in rare taxa. <em>C.ace</em> is defined as <span class="math display">\[1-\frac{a1}{N.rare}\]</span>, and <span class="math display">\[\gamma\]</span> is a function of the sum of taxa occurrences up to 10, S.rare, and C.ace.</p>
+Where <span class="math inline">\(S.abund\)</span> is the number of “abundant” taxa, <span class="math inline">\(S.rare\)</span> is the number of “rare” taxa, and <span class="math inline">\(N.rare\)</span> is the number of individuals in rare taxa. <span class="math inline">\(C.ace\)</span> is defined as <span class="math inline">\(1-\frac{a1}{N.rare}\)</span>, and <span class="math inline">\(\gamma\)</span> is a function of the sum of taxa occurrences up to 10, S.rare, and C.ace.</p>
 <pre class="r"><code>## calculate ACE for Sarah
 
 # first, get Sarah&#39;s microbiome
@@ -260,7 +265,7 @@ sarah &lt;- samples[2,]
 ## ---- Build ACE equation 
 
 # get number of &quot;rare&quot; taxa (under or equal to 10)
-S_rare = length(which(sarah[sarah &gt; 0] &lt;= 10)) ## NOTE: does NOT include zero abundance 
+S_rare = length(which(sarah[sarah &gt; 0] &lt;= 10)) ## NOTE: does NOT include zero abundance (taxa which are present in Jenny&#39;s microbiome but not Sarah&#39;s)
 
 # get number of &quot;abundant&quot; taxa (over 10)
 S_abund = length(which(sarah[sarah &gt; 0] &gt; 10))
@@ -274,7 +279,7 @@ N.rare = sum(sarah[sarah &lt; 11])
 # get C.ace
 C.ace = 1 - a1 / N.rare
 
-# &quot;Gamma&quot; model from vegan source code
+### &quot;Gamma&quot; model from vegan source code
 i &lt;- 1:10
 COUNT &lt;- function(i, counts) {
   length(counts[counts == i])
@@ -294,7 +299,7 @@ identical(ACE, alpha$ACE[2])</code></pre>
 <p>Similarly to Chao1, we conclude that Jenny has higher richness than Sarah.</p>
 <div id="is-this-problematic" class="section level3">
 <h3>Is this problematic?</h3>
-<p>Does the arbitrary threshold of 10 scale to different ecological systems? Keep in mind that these indices were created several decades before next-generation sequencing allowed us to capture thousands of bacteria in a single sample. Is a taxa’s abundance considered “rare” if there are fewer than 10 counts in a sample? If our sequencing depth captured 300,000 reads for this sample, then maybe we consider an abundance of 3,000 to be “rare” (0.01%). When using the ACE equation, keep this threshold in mind.</p>
+<p>Does the arbitrary threshold of 10 scale to different ecological systems? Keep in mind that these indices were created several decades before next-generation sequencing allowed us to capture thousands of bacteria in a single sample. Is a taxa’s abundance considered “rare” if there are fewer than 10 counts in a sample? If our sequencing depth captured 300,000 reads in Sarah’s microbiome, then maybe we consider an abundance of 3,000 to be “rare” (0.01%). When using the ACE equation, keep this threshold in mind.</p>
 </div>
 </div>
 <div id="comparing-richness-estimates" class="section level2">
@@ -304,16 +309,22 @@ identical(ACE, alpha$ACE[2])</code></pre>
 
 # first, make vertical
 plot.datv &lt;- plot.dat %&gt;% 
-  pivot_longer(cols = c(&quot;Observed&quot;, &quot;Chao1&quot;, &quot;ACE&quot;), names_to = &quot;index&quot;, values_to = &quot;richness&quot;) %&gt;% 
+  pivot_longer(cols = c(&quot;Observed&quot;, &quot;Chao1&quot;, &quot;ACE&quot;), 
+               names_to = &quot;index&quot;, 
+               values_to = &quot;richness&quot;) %&gt;% 
   # round our values to plot them clearly
   mutate(richness = round(richness, 2))
 
 # plot
 ggbarplot(data = plot.datv, x = &quot;Sample&quot;, y = &quot;richness&quot;, fill = &quot;index&quot;,
+          # group indices together 
           group = &quot;index&quot;, position = position_dodge(0.8), label = TRUE,
-          legend = &quot;left&quot;) </code></pre>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="576" />
-Importantly, we would come to the same conclusion regardless of the index we chose for our analysis: Jenny’s microbiome has higher richness than Sarah’s. We would observe a slightly larger effect size with ACE, but it would not change our overall results.</p>
+          # move legend to left of the plot
+          legend = &quot;left&quot;,
+          # add subtitle
+          subtitle = &quot;All richness estimates&quot;) </code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="576" /></p>
+<p>Importantly, we would come to the same conclusion regardless of the index we chose for our analysis: Jenny’s microbiome has higher richness than Sarah’s. We would observe a slightly larger effect size with ACE, but it would not change our overall results.</p>
 </div>
 </div>
 <div id="evenness-indices-shannons-simpsons-and-inverse-simpsons" class="section level1">
@@ -321,14 +332,14 @@ Importantly, we would come to the same conclusion regardless of the index we cho
 <p>Observed Taxa, Chao1, and ACE are all estimates of richness, or the number of taxa. Shannon’s, Simpson’s, and Inverse Simpson’s quantify richness in addition to “evenness”, or the distribution of the species abundance. Evenness can be thought of the balance of each taxa present in a sample: If Jenny has 3 bacteria in her microbiome and each has an abundance of 50, then she has perfect evennness. If she has 3 bacteria in her microbiome and one has an abundance of 50, one has an abundance of 1500, and one has an abundance of 2, then she has lower evenness. In the field of population ecology, a population is considered less diverse if it is dominated by one or two species, and considered more diverse if the abundance of each taxa is distributed evenly.</p>
 <div id="shannons-index" class="section level2">
 <h2>Shannon’s index</h2>
-<p>The Shannon index (also called Shannon-Wiener Index or Shannon’s H) is perhaps the most commonly used index of alpha diversity. It was derived in the 1940’s by Claude Shannon and has become ubiquitous in most life science disciplines <span class="citation">[@spellerberg2003]</span>. In technical terms, Shannon’s diversity is a calculation for “entropy”; it is the uncertainty of predicting which species the next sample would be.</p>
-<p>Let’s take a quick side step to illustrate this: imagine two ball pits. Ball pit #1 contains 9 blue balls and 1 red ball. What is the probability that the next ball we randomly select from the pit will be red?
-Ball pit #2 contains 4 blue balls and 5 red balls. Now how certain can we be that the next ball we randomly select will be red? Ball pit #2 has the same <strong>richness</strong> as Ball pit #1, but it is more <strong>even</strong> and will therefore have a higher Shannon’s H.</p>
+<p>The Shannon index (also called Shannon-Wiener Index or Shannon’s H) is perhaps the most commonly used index of alpha diversity. It was derived in the 1940’s by Claude Shannon and has become ubiquitous in most life science disciplines <span class="citation">(<a href="#ref-spellerberg2003" role="doc-biblioref">Spellerberg and Fedor 2003</a>)</span>. In technical terms, Shannon’s diversity is a calculation for “entropy”; it is the uncertainty of predicting which species the next sample is.</p>
+<p>Let’s take a quick side step to illustrate this: imagine two ball pits. Ball pit #1 contains 9 blue balls and 1 red ball. What is the probability that the next ball we randomly select from the pit will be red?</p>
+<p>Ball pit #2 contains 4 blue balls and 5 red balls. Now how certain can we be that the next ball we randomly select will be red? Ball pit #2 has the same <strong>richness</strong> as Ball pit #1, but it is more <strong>even</strong> and will therefore have a higher Shannon’s H.</p>
 <p>Calculating Shannon’s H by hand can help us contextualize this in a microbiome analysis. The equation is:</p>
 <p><span class="math display">\[
 H = -\sum_{i = 1}^Np_i * log(b)p_i
 \]</span></p>
-<p>Where <em>p_i</em> is the proportional abundance of taxa <em>i</em> and <em>b</em> is the log base. The default log base in <code>phyloseq</code> and <code>vegan</code> is <em>exp(1)</em>.</p>
+<p>Where <span class="math inline">\(p_i\)</span> is the proportional abundance of taxa <span class="math inline">\(i\)</span> and <span class="math inline">\(b\)</span> is the log base. The default log base in <code>phyloseq</code> and <code>vegan</code> is <span class="math inline">\(exp(1)\)</span>.</p>
 <pre class="r"><code>## calculate Shannon&#39;s H for Sarah
 
 # first, get a sum of Sarah&#39;s taxa for proportional abundance
@@ -352,13 +363,13 @@ identical(H, alpha$Shannon[2])</code></pre>
 </div>
 <div id="simpsons-index" class="section level2">
 <h2>Simpson’s index</h2>
-<p>Simpson’s index is very closely related to Shannon’s index and was also derived in the 1940’s by E.H. Simpson <span class="citation">[@simpson1949]</span>. We’re still working with proportional abundances of each taxa. Simpson’s index is simply the sum of the squared proportional abundances.</p>
-<p>First, we calculate “Simpson’s concentration”, or <em>D</em>:
-<span class="math display">\[
+<p>Simpson’s index is very closely related to Shannon’s index and was also derived in the 1940’s by E.H. Simpson <span class="citation">(<a href="#ref-simpson1949" role="doc-biblioref">Simpson 1949</a>)</span>. We’re still working with proportional abundances of each taxa. Simpson’s index is simply the sum of the squared proportional abundances.</p>
+<p>First, we calculate “Simpson’s concentration”, or <em>D</em>:</p>
+<p><span class="math display">\[
 D = \sum_{i = 1}^N p_i^2
 \]</span></p>
 <p>Then, Simpson’s index is derived as: <span class="math display">\[Simpsons = 1-D\]</span>.</p>
-<p>What is <em>D</em>? This is the probability that two random draws from the same sample belong to the same species <span class="citation">[@lande1996]</span>. Let’s go back to our ball pit from Shannon’s diversity. If Ball pit #1 has 9 blue balls and 1 red ball, the probability that two random draws result in two blue balls are high. Ball pit #2 contains 4 blue balls and 5 red balls. What is the probability that two random draws will result in two blue balls? We are much less confident in these odds.</p>
+<p>What is <span class="math inline">\(D\)</span>? This is the probability that two random draws from the same sample belong to the same species <span class="citation">(<a href="#ref-lande1996" role="doc-biblioref">Lande 1996</a>)</span>. Let’s go back to our ball pit from Shannon’s diversity. If Ball pit #1 has 9 blue balls and 1 red ball, the probability that two random draws result in two blue balls are high. Ball pit #2 contains 4 blue balls and 5 red balls. What is the probability that two random draws will result in two blue balls? We are much less confident in these odds.</p>
 <p>Simpson’s index is the probability that two random draws belong to <strong>different</strong> species.</p>
 <pre class="r"><code>## calculate Simpson&#39;s index for Sarah
 
@@ -367,8 +378,11 @@ sum.taxa &lt;- sum(sarah)
 
 # calculate Simpson&#39;s index D
 D = sum(
+  # squared proportional abundance of taxa A
   (sarah[,1] / sum.taxa) ^ 2,
+  # squared proportional abundance of taxa B
   (sarah[,2] / sum.taxa) ^2,
+  # squared proportional abundance of taxa C
   (sarah[,3] / sum.taxa) ^ 2
 )
 
@@ -382,7 +396,7 @@ identical(Simpson, alpha$Simpson[2])</code></pre>
 </div>
 <div id="inverse-simpson" class="section level2">
 <h2>Inverse Simpson</h2>
-<p>Inverse Simpson gets even easier to calculate. It is quite literally the inverse of Simpson’s diversity.</p>
+<p>Inverse Simpson is simple to calculate. It is quite literally the inverse of Simpson’s diversity.</p>
 <p>First, we start with <em>D</em> from above:
 <span class="math display">\[
 D = \sum_{i = 1}^N p_i^2
@@ -396,7 +410,7 @@ identical(InvSimp, alpha$InvSimpson[2])</code></pre>
 <pre><code>## [1] TRUE</code></pre>
 <div id="whats-the-difference-between-inverse-simpson-and-simpson" class="section level3">
 <h3>What’s the difference between Inverse Simpson and Simpson?</h3>
-<p>Inverse Simpson is calculated in such a way that in a community with total number of species <em>S</em>, the maximum value of Inverse Simpson’s is equal to <em>S</em> in a perfectly even community (all species have the same proportional abundance) <span class="citation">[@lande1996]</span>.</p>
+<p>Inverse Simpson is calculated in such a way that in a community with total number of species <span class="math inline">\(S\)</span>, the maximum value of Inverse Simpson’s is equal to <span class="math inline">\(S\)</span> in a perfectly even community (all species have the same proportional abundance) <span class="citation">(<a href="#ref-lande1996" role="doc-biblioref">Lande 1996</a>)</span>.</p>
 </div>
 </div>
 <div id="comparing-evenness-estimates" class="section level2">
@@ -405,15 +419,55 @@ identical(InvSimp, alpha$InvSimpson[2])</code></pre>
 
 # first, make vertical
 plot.datv &lt;- plot.dat %&gt;% 
-  pivot_longer(cols = c(&quot;Shannon&quot;, &quot;Simpson&quot;, &quot;InvSimpson&quot;), names_to = &quot;index&quot;, values_to = &quot;richness&quot;) %&gt;% 
+  pivot_longer(cols = c(&quot;Shannon&quot;, &quot;Simpson&quot;, &quot;InvSimpson&quot;), 
+               names_to = &quot;index&quot;, 
+               values_to = &quot;richness&quot;) %&gt;% 
   # round our values to plot them clearly
   mutate(richness = round(richness, 2))
 
 # plot
 ggbarplot(data = plot.datv, x = &quot;Sample&quot;, y = &quot;richness&quot;, fill = &quot;index&quot;,
-          group = &quot;index&quot;, position = position_dodge(0.8), label = TRUE,
-          legend = &quot;left&quot;) </code></pre>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-14-1.png" width="576" />
-Similarly to the richness estimates, our general conclusions are the same regardless of which index we choose. We conclude that Jenny’s microbiome has higher “alpha diversity” than Sarah’s microbiome. In contrast to the richness estimates, however, the indices differ amongst each other. It’s important to remember that <strong>we can’t compare between different alpha diversity indices</strong>.</p>
+          # group by index
+          group = &quot;index&quot;, position = position_dodge(0.8), 
+          # add the estimate to the top of the bars
+          label = TRUE,
+          # move legend to left
+          legend = &quot;left&quot;,
+          # add subtitle
+          subtitle = &quot;All evenness indices&quot;) </code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-13-1.png" width="576" /></p>
+<p>Similarly to the richness estimates, our general conclusions are the same regardless of which index we choose. We conclude that Jenny’s microbiome has higher “alpha diversity” than Sarah’s microbiome.</p>
+</div>
+<div id="which-one-do-i-choose" class="section level2">
+<h2>Which one do I choose?</h2>
+<p>I hope that I’ve convinced you of a distinction between richness indices and evenness indices. Depending on your research question, it may be appropriate to evaluate one measure of richness and one measure of evenness. Or, you may only be interested in the evenness of your system (after all, most interventions to change the microbiome aren’t expected to remove or add species and therefore we won’t expect to see a difference in richness).</p>
+<p>However, the <code>vegan</code> help page for <code>diversity</code> says it best:</p>
+<blockquote>
+<p>…However, these indices are all very closely related (Hill 1973), and there is no reason to despise one more than others (but if you are a graduate student, don’t drag me in, but obey your Professor’s orders).</p>
+</blockquote>
+</div>
+<div id="next-put-this-into-practice" class="section level2">
+<h2>Next: Put this into practice!</h2>
+<p>Join us in <a href="post/alpha-diversity-part2">Part 2</a> to perform a statistical analysis on a “real” microbiome!</p>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-chao1987" class="csl-entry">
+Chao, A. 1987. <span>“Estimating the Population Size for Capture-Recapture Data with Unequal Catchability.”</span> <em>Biometrics</em> 43 (4): 783–91.
+</div>
+<div id="ref-lande1996" class="csl-entry">
+Lande, Russell. 1996. <span>“Statistics and Partitioning of Species Diversity, and Similarity Among Multiple Communities.”</span> <em>Oikos</em> 76 (1): 5–13.
+</div>
+<div id="ref-ohara2005" class="csl-entry">
+O’Hara, R. B. 2005. <span>“Species Richness Estimators: How Many Species Can Dance on the Head of a Pin?”</span> <em>Journal of Animal Ecology</em> 74 (2): 375–86.
+</div>
+<div id="ref-simpson1949" class="csl-entry">
+Simpson, E. H. 1949. <span>“Measurement of Diversity.”</span> <em>Nature</em> 163 (688).
+</div>
+<div id="ref-spellerberg2003" class="csl-entry">
+Spellerberg, Ian F., and Peter J. Fedor. 2003. <span>“A Tribute to Claude Shannon (1916–2001) and a Plea for More Rigorous Use of Species Richness, Species Diversity and the <span>‘Shannon–Wiener’</span> Index.”</span> <em>Global Ecology and Biogeography</em> 12 (3): 177–79.
+</div>
+<div id="ref-whittaker1972" class="csl-entry">
+Whittaker, R. H. 1972. <span>“Evolution and Measurement of Species Diversity.”</span> <em>Taxon</em> 21 (2/3): 213–51.
+</div>
+</div>
 </div>
 </div>

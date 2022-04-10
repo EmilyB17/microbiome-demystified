@@ -13,6 +13,9 @@ image:
   caption: ''
   focal_point: ''
   preview_only: no
+bibliography: biblio.bib
+share: true
+commentable: true
 projects: []
 # SET AS DRAFT
 draft: false
@@ -21,7 +24,7 @@ output:
     #code_download: true
     toc: true
     #toc_float: true
-    fig_width: 6
+    fig_width: 8
 ---
 
 ```{r setup, include=FALSE}
@@ -30,21 +33,27 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 # Alpha Diversity in a "real" microbiome
 
-In Part 1, we made a very simplistic 'microbiome'. In Part 2, we'll work with one of the built-in datasets from the `microViz` package. 
+In Part 1, we created a simplistic microbiome to illustrate differences between alpha diversity indices. In Part 2, we'll calculate alpha diversity on a 'real' microbiome, apply a statistical analysis, and build a publication-ready figure. 
 
+{{% callout note %}}
+If you haven't read [Part 1](/post/alpha-div-part1), start there!
+{{% /callout %}}
 
-## What's our dataset
+## Our "real" microbiome and research question
 
-The dataset we'll use is called "ibd_phylo" from the `corncob` package. This is from a 2017 dataset and compares 16S data from children with ulcerative colitis and Crohn's disease, to healthy children.
+We'll use a dataset called "ibd_phylo" from the `corncob` package. This is from a 2017 paper and compares 16S data from children with ulcerative colitis and Crohn's disease, to healthy children [@papa2012non].
 
 ### Our research question:
 
-Here's the first version of our research question that you'll see most often in microbiome papers: 
-**Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower alpha diversity than the microbiome of healthy children?**
+The kind of hypothesis we see often in microbiome papers is worded like this: 
+
+> Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower alpha diversity than the microbiome of healthy children?
 
 BUT...
-Remember from Part 1 that there are several alpha diversity metrics that estimate richness, evenness, or both. Let's be a little more specific with our research question and specify the metrics that we'll use *a priori*.
-**Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower richness (Chao1) or evenness Shannon's H index) than the microbiome of healthy children?**
+
+Remember from Part 1 that there are multiple ways to measure 'alpha diversity' depending on whether we are interested in richness, evenness, or both. Let's be a little more specific with our research question and specify our indices *a priori*.
+
+> Does the gut microbiome of children with ulcerative colitis or Crohn's disease have lower richness (Chao1) or evenness (Shannon's H index) than the microbiome of healthy children?
 
 
 First, we'll install the necessary packages.
@@ -52,8 +61,14 @@ First, we'll install the necessary packages.
 ```{r, eval = FALSE, code_folding = TRUE}
 
 # if needed, install the requisite packages
+
+# CRAN installs
 install.packages(c("vegan", "ggpubr", "BiocManager", "tidyverse", "corncob", "devtools", "colorspace"))
+
+# Bioconductor installs
 BiocManager::install("phyloseq")
+
+# Github installs
 devtools:install_github("david-barnett/microViz@0.9.0") # we want the latest version
 
 ```
@@ -75,7 +90,7 @@ data(ibd_phylo)
 ```
 
 There are 91 samples in the dataset and 36,439 bacterial taxa. The explanatory variable that we're interested in is called "DiseaseState". There is one sample categorized as "IBDundef", so we'll remove that sample before continuing. 
-There are several additional sample variables that we would want to examine for covariates, but to keep this simple we'll treat it as an ANOVA analysis.
+There are several additional sample variables that we would want to examine for inclusion as covariates, but to keep this simple we'll treat it as a standard ANOVA analysis.
 
 ```{r}
 
@@ -93,7 +108,7 @@ ps <- ibd_phylo %>%
 
 ## Get alpha diversity metrics with `estimate_richness`
 
-The build-in alpha diversity function in `phyloseq` is called "estimate_richness". We'll calculate all metrics on our dataset. This creates a dataframe that we'll call "alpha".
+We'll use `estimate_richness` from `phyloseq` to calculate the common alpha diversity indices. This creates a dataframe that we'll call "alpha".
 
 **Remember: alpha diversity is calculated independently for each sample**
 
@@ -108,11 +123,11 @@ knitr::kable(head(alpha))
 
 ```
 
-The dataframe this creates is a little clunky, so we'll use `microViz` to add our explanatory variable of interest (DiseaseState). `estimate_richness` moves the sample names of the phyloseq object to rownames in the dataframe, and adds a leading "X" to the rownames because they are numeric. This adds an extra line of code to wrangle.
+The dataframe this creates is a little clunky, so we'll use `microViz` to add our explanatory variable of interest (DiseaseState). `estimate_richness` moves the sample names of the phyloseq object to rownames in the dataframe, and adds a leading "X" to the rownames because they are numeric. This adds an extra bit of wrangling.
 
 ```{r}
 
-## Get our explanatory variable added to the alpha dataset
+## Add our explanatory variable to the alpha dataframe
 
 # first, get our sample_data in a dataframe
 sampdf <- samdat_tbl(ps) %>% 
@@ -121,8 +136,9 @@ sampdf <- samdat_tbl(ps) %>%
 
 ## add our sample data to the alpha dataframe
 alpha <- alpha %>% 
-  # first, fix the rownames issue
+  # move the rownames to a column
   rownames_to_column(var = ".sample_name") %>% 
+  # remove the leading "X" in front of rownames (so it matches our sampdf)
   mutate(.sample_name = str_remove_all(.sample_name, "^X")) %>% 
   # join to the sample data
   full_join(sampdf, by = ".sample_name")
@@ -131,33 +147,21 @@ alpha <- alpha %>%
 
 ## Exploratory analysis: get to know our data
 
-I always like to start with making some plots of the data to look at model diagnostics, get to know the data, and look for any potential issues. `phyloseq` has a built-in plotting mechanism. Since we chose Chao1 and Shannon's index, we'll plot those: 
+I always like to start with making some plots of the data to look at model diagnostics, get to know the data, and look for any potential issues. 
 
-```{r}
-# plot with phyloseq
-plot_richness(ps, x = "DiseaseState", color = "DiseaseState",
-              measures = c("Shannon", "Chao1"))
-```
+Let's get summary statistics with `rstatix`:
 
-We'll also get summary statistics on our data with `rstatix`:
 
 ```{r}
 
-# get summary statistics - overall
+# get summary stats (print in table form)
 knitr::kable(alpha %>% 
-               get_summary_stats(type = "common"))
-
-```
-
-We can also get summary statistics for our metrics of interest and the explanatory variables:
-
-```{r}
-
-# get summary stats
-knitr::kable(alpha %>% 
-  select(DiseaseState, Shannon, Chao1) %>% 
-  group_by(DiseaseState) %>% 
-  get_summary_stats(type = "common"))
+               # select only our columns of interest
+               select(DiseaseState, Shannon, Chao1) %>% 
+               # print summary stats for each Disease State
+               group_by(DiseaseState) %>% 
+               # get mean & standard deviation
+               get_summary_stats(type = "mean_sd"))
 
 ```
 
@@ -165,18 +169,22 @@ This dataset is very imbalanced (almost double the number of subjects with ulcer
 
 ### Model Diagnostics: Chao1
 
-Let's build a linear model for Chao1 and test it for parametric fit. 
+Let's build a linear model for Chao1 and test it for parametric fit. We use simple base R plotting mechanisms.
+
 ```{r}
 
 # build a test model 
 testmod <- lm(Chao1 ~ DiseaseState, data = alpha)
 
-# examine model diagnostics
-par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
-plot(testmod) # base R's built-in diagnostic plots
+## base R function to plot the following figures side-by-side
+par(mfrow = c(1, 2))
 
 # plot a histogram of residuals
 hist(resid(testmod), main = "Residual histogram")
+
+# plot a QQ plot and add a fit line
+qqnorm(resid(testmod), main = "QQ plot")
+qqline(resid(testmod))
 
 ```
 
@@ -187,13 +195,15 @@ There's some issues with normality (shown by the QQ-plot and histogram). Let's t
 # log transform the dependent variable
 testmod1 <- lm(log1p(Chao1) ~ DiseaseState, data = alpha)
 
-## examine model diagnostics
-par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
-plot(testmod1) # base R's built-in diagnostic plots
+## base R function to plot the following figures side-by-side
+par(mfrow = c(1, 2))
 
 # plot a histogram of residuals
-dev.off()
-hist(resid(testmod1), main = "Residual histogram of log transformation")
+hist(resid(testmod1), main = "Residual histogram of log trans.")
+
+# plot a QQ plot and add a fit line
+qqnorm(resid(testmod1), main = "QQ plot of log trans.")
+qqline(resid(testmod1))
 
 ```
 
@@ -211,7 +221,7 @@ summary(modChao)
 
 ```
 
-The ANOVA is significant, let's take a look at the Tukey's post-hoc test:
+The ANOVA is significant, so let's take a look at the Tukey's post-hoc test:
 
 ```{r}
 
@@ -219,7 +229,7 @@ The ANOVA is significant, let's take a look at the Tukey's post-hoc test:
 TukeyHSD(modChao)
 
 ```
-There is only a difference between ulcerative colitis and healthy (non-IBD) samples. Let's plot that to examine - instead of a boxplot, we'll use a violin plot that shows the distribution of the data. Since we log transformed our data, we can also plot the log transformation with `ggpar`. 
+There is only a difference between ulcerative colitis and healthy (non-IBD) samples. Let's plot that to examine - instead of a boxplot, we'll use a violin plot that shows the distribution of the data. Since we log transformed our data, we can show that with `ggpar`. 
 
 ```{r}
 
@@ -228,7 +238,9 @@ plot1 <- ggviolin(data = alpha, x = "DiseaseState", y = "Chao1",
                   # color by DiseaseState
           fill = "DiseaseState",
           # add the data points
-          add = "jitter")
+          add = "jitter",
+          # add title
+          title = "Chao1 is lower in ulcerative colitis")
 
 # transform the y axis to log 10
 ggpar(plot1, yscale = "log10", format.scale = TRUE,
@@ -247,12 +259,15 @@ We'll repeat this process for Shannon's index. Let's build a linear model for Sh
 # build a test model 
 testmod <- lm(Shannon ~ DiseaseState, data = alpha)
 
-# examine model diagnostics
-par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
-plot(testmod) # base R's built-in diagnostic plots
+## base R function to plot the following figures side-by-side
+par(mfrow = c(1, 2))
 
 # plot a histogram of residuals
 hist(resid(testmod), main = "Residual histogram")
+
+# plot a QQ plot and add a fit line
+qqnorm(resid(testmod), main = "QQ plot")
+qqline(resid(testmod1))
 
 ```
 
@@ -263,13 +278,16 @@ This doesn't look awful, but it's not fantastic... let's try a log transformatio
 # build a test model with a log transformation
 testmod1 <- lm(log1p(Shannon) ~ DiseaseState, data = alpha)
 
-# examine model diagnostics
-par(mfrow = c(2,2)) # this creates a 2x2 matrix for the next 4 plots
-plot(testmod1) # base R's built-in diagnostic plots
+## base R function to plot the following figures side-by-side
+par(mfrow = c(1, 2))
 
 # plot a histogram of residuals
-dev.off()
-hist(resid(testmod1), main = "Residual histogram with log transformation")
+hist(resid(testmod1), main = "Residual histogram of log trans.")
+
+# plot a QQ plot and add a fit line
+qqnorm(resid(testmod1), main = "QQ plot of log trans.")
+qqline(resid(testmod1))
+
 ```
 
 Eh, not a huge improvement. We'll use the un-transformed data and proceed. 
@@ -304,7 +322,9 @@ ggviolin(data = alpha, x = "DiseaseState", y = "Shannon",
                   # color by DiseaseState
           fill = "DiseaseState",
           # add the data points
-          add = "jitter")
+          add = "jitter",
+         # add title
+         title = "Shannon's H is lower in ulcerative colitis")
 
 ```
 
@@ -312,13 +332,15 @@ Looks good! After this analysis, we would conclude that the gut microbiome of th
 
 # A caution of multiple comparisons
 
-Keep in mind that we're using these TWO metrics to describe ONE parameter: alpha diversity. Technically, that's a violation of multiple comparisons. We should be correcting our analyses for 2 comparisons. What if we decided to analyze a few more metrics, like Shannon's and Simpson's, or Simpson's and Inverse Simpson's?
+**Keep in mind that we're using these TWO metrics to describe ONE parameter: alpha diversity**. Technically, that's a violation of multiple comparisons. We should be correcting our analyses for 2 comparisons. What if we decided to analyze a few more metrics, like Shannon's and Simpson's, or Simpson's and Inverse Simpson's?
 
 One, those all tell us different versions of the same story, so using more than one is not necessarily informative. Two, we now need to account for all of those comparisons. 
 
-*Be cautious of papers that measure multiple (or worse, ALL) of the alpha diversity indices and report the ones that are significant (I'm absolutely guilty of doing this before I dug more into these indices to understand them).*
+*Be cautious of papers that measure multiple (or worse, ALL) of the alpha diversity indices and report the ones that are significant* (I'm absolutely guilty of doing this in the past!).
 
-To finish our analysis, let's correct our ANOVA for multiple comparisons. To be as strict as possible, we'll use Bonferroni's correction. Our former critical alpha value was 0.05 (the standard comparison: if the p value < critical alpha, we conclude that as 'significant'). Our new critical alpha will be 0.05 / number of comparisons. 
+## Correcting for multiple comparisons
+
+To finish our analysis, let's correct our ANOVA for multiple comparisons. To be as strict as possible, we'll use Bonferroni's correction. Our former critical $\alpha$ value was 0.05 (the standard comparison: if the p value < critical $\alpha$, we conclude that as 'significant'). Our new critical $\alpha$ will be 0.05 / number of comparisons. 
 
 We'll re-assess both models to see if the p value meets significance after accounting for multiple comparisons:
 
@@ -350,10 +372,12 @@ I always plot faceted figures using a vertical dataset, so we'll start there.
 
 ## make our dataset vertical and subset for only Chao1 and Shannon's
 alphav <- alpha %>% 
+  # keep the columns that we want
   select(.sample_name, Chao1, Shannon, DiseaseState) %>% 
+  # make vertical
   pivot_longer(cols = c(Shannon, Chao1),
                names_to = "Index", values_to = "value") %>% 
-  # re-order values to plot in correct order (UC, CD, nonIBD)
+  # re-order values to plot in correct order (UC, CD, nonIBD) (a bit icky)
   mutate(Status = recode(DiseaseState,
                          UC = "UC",
                          CD = "Crohn's",
@@ -365,7 +389,7 @@ alphav <- alpha %>%
 
 To build an informative figure, we can use a dotplot that shows the distribution of the data and some other `ggpubr` and `ggplot` tricks to change the default facet labels. Wave goodbye to the days of adding labels with text boxes in Powerpoint!
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 
 # plot the vertical data 
 ggdotplot(data = alphav, x = "Status", y = "value",
