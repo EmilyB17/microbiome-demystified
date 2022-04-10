@@ -2,9 +2,9 @@
 title: "Alpha Diversity Demystified: Part 1"
 author: Emily Van Syoc
 date: '2022-03-10'
-slug: alpha-div-part1-html
+slug: alpha-div-part1
 categories: [tutorials]
-tags: []
+tags: [alpha-div]
 subtitle: 'Part 1: What is alpha diversity?'
 summary: 'Learn the basics of richness and evenness with a simplified microbiome'
 authors: []

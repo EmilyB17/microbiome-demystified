@@ -7,9 +7,19 @@ main:
   - name: Tutorials
     url: '#posts'
     weight: 10
+    identifier: Tutorials
   - name: About
     url: '#about'
     weight: 20
   - name: Contact
     url: '#contact'
     weight: 70
+### sub menus for Tutorials
+  - name: Alpha Diversity, Part 1
+    parent: Tutorials
+    url: "post/alpha-div-part1"
+    weight: 10
+  - name: Alpha Diversity, Part 2
+    parent: Tutorials
+    url: "post/alpha-diversity-part2"
+    weight: 20
