@@ -34,7 +34,7 @@ output:
 <li><a href="#how-do-we-understand-alpha-diversity-indices">How do we understand alpha diversity indices?</a></li>
 <li><a href="#what-you-need-to-follow-this-guide">What you need to follow this guide</a></li>
 </ul></li>
-<li><a href="#creating-a-simplistic-data-set">Creating a simplistic data set</a></li>
+<li><a href="#create-a-simplified-microbiome">Create a simplified microbiome</a></li>
 <li><a href="#estimate-alpha-diversity-in-phyloseq">Estimate alpha diversity in phyloseq</a></li>
 <li><a href="#richness-indices-observed-taxa-chao1-and-ace">Richness indices: Observed taxa, Chao1, and ACE</a>
 <ul>
@@ -85,8 +85,8 @@ install.packages(c(&quot;vegan&quot;, &quot;ggpubr&quot;, &quot;BiocManager&quot
 BiocManager::install(&quot;phyloseq&quot;)</code></pre>
 </div>
 </div>
-<div id="creating-a-simplistic-data-set" class="section level1">
-<h1>Creating a simplistic data set</h1>
+<div id="create-a-simplified-microbiome" class="section level1">
+<h1>Create a simplified microbiome</h1>
 <p>Let’s create an overly simplistic microbiome for two fake people, Jenny and Sarah. There are 3 bacteria in their microbiome; Taxa A, Taxa B, and Taxa C.</p>
 <pre class="r"><code># first, load the requisite packages
 library(phyloseq)
@@ -104,6 +104,7 @@ samples &lt;- data.frame(
 
 # convert the dataframe to a phyloseq object
 otu &lt;- phyloseq::otu_table(samples, taxa_are_rows = FALSE)</code></pre>
+<p><img src="/img/alpha-image1.png" alt="demo" class="img-responsive"></p>
 </div>
 <div id="estimate-alpha-diversity-in-phyloseq" class="section level1">
 <h1>Estimate alpha diversity in phyloseq</h1>
@@ -335,6 +336,7 @@ ggbarplot(data = plot.datv, x = &quot;Sample&quot;, y = &quot;richness&quot;, fi
 <p>The Shannon index (also called Shannon-Wiener Index or Shannon’s H) is perhaps the most commonly used index of alpha diversity. It was derived in the 1940’s by Claude Shannon and has become ubiquitous in most life science disciplines <span class="citation">(<a href="#ref-spellerberg2003" role="doc-biblioref">Spellerberg and Fedor 2003</a>)</span>. In technical terms, Shannon’s diversity is a calculation for “entropy”; it is the uncertainty of predicting which species the next sample is.</p>
 <p>Let’s take a quick side step to illustrate this: imagine two ball pits. Ball pit #1 contains 9 blue balls and 1 red ball. What is the probability that the next ball we randomly select from the pit will be red?</p>
 <p>Ball pit #2 contains 4 blue balls and 5 red balls. Now how certain can we be that the next ball we randomly select will be red? Ball pit #2 has the same <strong>richness</strong> as Ball pit #1, but it is more <strong>even</strong> and will therefore have a higher Shannon’s H.</p>
+<p><img src="/img/alpha-image2.png" alt="demo" class="img-responsive"></p>
 <p>Calculating Shannon’s H by hand can help us contextualize this in a microbiome analysis. The equation is:</p>
 <p><span class="math display">\[
 H = -\sum_{i = 1}^Np_i * log(b)p_i

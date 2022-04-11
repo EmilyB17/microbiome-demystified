@@ -61,10 +61,9 @@ BiocManager::install("phyloseq")
 
 ```
 
-# Creating a simplistic data set
+# Create a simplified microbiome
 
 Let's create an overly simplistic microbiome for two fake people, Jenny and Sarah. There are 3 bacteria in their microbiome; Taxa A, Taxa B, and Taxa C.
-
 
 ```{r}
 
@@ -86,6 +85,9 @@ samples <- data.frame(
 otu <- phyloseq::otu_table(samples, taxa_are_rows = FALSE)
 
 ```
+
+
+<img src="/img/alpha-image1.png" alt="demo" class="img-responsive">
 
 # Estimate alpha diversity in phyloseq
 
@@ -316,6 +318,8 @@ The Shannon index (also called Shannon-Wiener Index or Shannon's H) is perhaps t
 Let's take a quick side step to illustrate this: imagine two ball pits. Ball pit #1 contains 9 blue balls and 1 red ball. What is the probability that the next ball we randomly select from the pit will be red? 
 
 Ball pit #2 contains 4 blue balls and 5 red balls. Now how certain can we be that the next ball we randomly select will be red? Ball pit #2 has the same **richness** as Ball pit #1, but it is more **even** and will therefore have a higher Shannon's H. 
+
+<img src="/img/alpha-image2.png" alt="demo" class="img-responsive">
 
 Calculating Shannon's H by hand can help us contextualize this in a microbiome analysis. The equation is:
 
